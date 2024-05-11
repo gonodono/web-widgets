@@ -1,0 +1,12 @@
+<resources>
+
+    <string name="app_name">Web Widgets</string>
+    <string name="view_minimal">View Minimal</string>
+    <string name="view_simple">View Simple</string>
+    <string name="view_scroll">View Scroll</string>
+    <string name="glance_minimal">Glance Minimal</string>
+    <string name="glance_simple">Glance Simple</string>
+    <string name="glance_scroll">Glance Scroll</string>
+    <string name="webshot">WebShot</string>
+
+</resources>

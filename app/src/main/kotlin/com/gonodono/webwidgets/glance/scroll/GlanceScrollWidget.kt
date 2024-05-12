@@ -13,7 +13,6 @@ import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.padding
-import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
 import androidx.glance.text.TextDefaults
@@ -60,7 +59,6 @@ private fun OverflowImage(
             style = TextDefaults.defaultTextStyle.copy(
                 color = ColorProvider(Color.Blue),
                 textAlign = TextAlign.Center,
-                fontWeight = FontWeight.Bold,
                 fontSize = 22.sp
             ),
             modifier = GlanceModifier

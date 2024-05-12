@@ -64,19 +64,12 @@ private fun landscapeSize(bundle: Bundle, density: Float): Size {
     return Size((width * density).toInt(), (height * density).toInt())
 }
 
-internal fun updateAppWidgetIds(
-    context: Context,
-    oldWidgetIds: IntArray,
-    newWidgetIds: IntArray
-) {
-    oldWidgetIds.forEachIndexed { index, oldId ->
-        setUrl(context, newWidgetIds[index], getUrl(context, oldId))
-    }
+internal fun setWidgetsRestored(context: Context, appWidgetIds: IntArray) {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
         val options = Bundle()
         options.putBoolean(OPTION_APPWIDGET_RESTORE_COMPLETED, true)
         val manager = context.appWidgetManager
-        newWidgetIds.forEach { manager.updateAppWidgetOptions(it, options) }
+        appWidgetIds.forEach { manager.updateAppWidgetOptions(it, options) }
     }
 }
 
@@ -97,8 +90,9 @@ internal inline val Context.widgetStates: SharedPreferences
 internal fun getUrl(context: Context, appWidgetId: Int) =
     context.widgetStates.getString(urlKey(appWidgetId), null)
 
-internal fun setUrl(context: Context, appWidgetId: Int, url: String?) =
+internal fun setUrl(context: Context, appWidgetId: Int, url: String?) {
     context.widgetStates.edit().putString(urlKey(appWidgetId), url).apply()
+}
 
 internal fun urlKey(appWidgetId: Int) = "url:$appWidgetId"
 

@@ -9,8 +9,7 @@
     android:divider="?android:dividerHorizontal"
     android:orientation="vertical"
     android:showDividers="middle"
-    tools:ignore="HardcodedText"
-    tools:viewBindingIgnore="true">
+    tools:ignore="HardcodedText">
 
     <ProgressBar
         android:id="@+id/progress"

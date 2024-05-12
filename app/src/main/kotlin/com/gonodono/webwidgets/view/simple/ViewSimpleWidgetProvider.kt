@@ -23,7 +23,7 @@ import com.gonodono.webwidgets.view.doAsync
 import com.gonodono.webwidgets.view.errorViews
 import com.gonodono.webwidgets.view.getUrl
 import com.gonodono.webwidgets.view.setUrl
-import com.gonodono.webwidgets.view.updateAppWidgetIds
+import com.gonodono.webwidgets.view.setWidgetsRestored
 import com.gonodono.webwidgets.view.urlKey
 import com.gonodono.webwidgets.view.widgetSize
 import com.gonodono.webwidgets.view.widgetStates
@@ -33,6 +33,7 @@ class ViewSimpleWidgetProvider : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
+            ACTION_OPEN -> handleActionOpen(context, intent)
             ACTION_RELOAD -> {
                 val appWidgetId = intent.appWidgetIdExtra
                 setUrl(context, appWidgetId, null)
@@ -43,7 +44,6 @@ class ViewSimpleWidgetProvider : AppWidgetProvider() {
                 )
             }
 
-            ACTION_OPEN -> handleActionOpen(context, intent)
             else -> super.onReceive(context, intent)
         }
     }
@@ -108,7 +108,20 @@ class ViewSimpleWidgetProvider : AppWidgetProvider() {
         oldWidgetIds: IntArray,
         newWidgetIds: IntArray
     ) {
-        updateAppWidgetIds(context, oldWidgetIds, newWidgetIds)
+        context.widgetStates.edit().run {
+            oldWidgetIds.forEachIndexed { index, oldId ->
+                val newId = newWidgetIds[index]
+                if (isInitialized(context, oldId)) {
+                    putBoolean(initializedKey(newId), true)
+                    remove(initializedKey(oldId))
+                }
+                putString(urlKey(newId), getUrl(context, oldId))
+                remove(urlKey(oldId))
+            }
+            apply()
+        }
+        setWidgetsRestored(context, newWidgetIds)
+        onUpdate(context, context.appWidgetManager, newWidgetIds)
     }
 }
 
@@ -137,27 +150,29 @@ private fun mainViews(
     appWidgetId: Int,
     webShot: WebShooter.WebShot?
 ) = RemoteViews(context.packageName, R.layout.simple_widget).also { views ->
-    if (webShot != null) {
-        views.setImageViewBitmap(R.id.image, webShot.bitmap)
-        val open = Intent(
-            ACTION_OPEN,
-            webShot.url.toUri(),
-            context,
-            ViewSimpleWidgetProvider::class.java
-        )
-        open.appWidgetIdExtra = appWidgetId
-        views.setViewVisibility(R.id.image, View.VISIBLE)
-        views.setOnClickPendingIntent(
-            R.id.image,
-            PendingIntent.getBroadcast(
+    when {
+        webShot != null -> {
+            views.setImageViewBitmap(R.id.image, webShot.bitmap)
+            val open = Intent(
+                ACTION_OPEN,
+                webShot.url.toUri(),
                 context,
-                appWidgetId,
-                open,
-                PendingIntent.FLAG_IMMUTABLE
+                ViewSimpleWidgetProvider::class.java
             )
-        )
-    } else {
-        views.setViewVisibility(R.id.timeout, View.VISIBLE)
+            open.appWidgetIdExtra = appWidgetId
+            views.setViewVisibility(R.id.image, View.VISIBLE)
+            views.setOnClickPendingIntent(
+                R.id.image,
+                PendingIntent.getBroadcast(
+                    context,
+                    appWidgetId,
+                    open,
+                    PendingIntent.FLAG_IMMUTABLE
+                )
+            )
+        }
+
+        else -> views.setViewVisibility(R.id.timeout, View.VISIBLE)
     }
     val reload = Intent(
         ACTION_RELOAD,
@@ -182,8 +197,7 @@ private fun isInitialized(context: Context, appWidgetId: Int) =
 
 private fun setInitialized(context: Context, appWidgetId: Int) {
     context.widgetStates.edit()
-        .putBoolean(initializedKey(appWidgetId), true)
-        .apply()
+        .putBoolean(initializedKey(appWidgetId), true).apply()
 }
 
 private fun initializedKey(appWidgetId: Int) = "initialized:$appWidgetId"

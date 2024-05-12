@@ -7,8 +7,7 @@
     android:layout_height="match_parent"
     android:background="@color/white"
     android:orientation="vertical"
-    tools:ignore="HardcodedText"
-    tools:viewBindingIgnore="true">
+    tools:ignore="HardcodedText">
 
     <TextView
         android:id="@+id/timeout"

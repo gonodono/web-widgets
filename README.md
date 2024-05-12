@@ -43,7 +43,7 @@ there that I may have overlooked here, and vice versa.
 
 + All of the examples assume that the page will load relatively quickly. Each
   one uses only the time available to it from its own component; i.e., there are
-  no separate `Worker`s or loader `Service`s. Consult the relevant section
+  no separate `Worker`s or loader `Service`s. Consult the corresponding sections
   below for the individual examples' respective time limits. In production, I'd
   suggest using `Worker`s everywhere. [This official Glance sample][sample] has
   an `ImageWorker` that's very close to what would be needed here.
@@ -107,6 +107,32 @@ documentation's stated limit of "about 45 seconds" for `provideContent()`.
 Apart from the stuff that Glance stores internally, none of these Widgets
 persist anything to disk, since `GlanceAppWidget` instances hang around holding
 state long enough to suffice for these basic examples.
+
+<br />
+
+## License
+
+MIT License
+
+Copyright (c) 2024 Mike M.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 
   [sample]: https://github.com/android/user-interface-samples/tree/main/AppWidget/app/src/main/java/com/example/android/appwidget/glance/image

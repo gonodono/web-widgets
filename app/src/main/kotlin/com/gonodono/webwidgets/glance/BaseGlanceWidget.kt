@@ -32,7 +32,6 @@ import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
-import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextDefaults
 import androidx.glance.unit.ColorProvider
@@ -130,6 +129,64 @@ internal abstract class BaseGlanceWidget : GlanceAppWidget() {
     }
 }
 
+abstract class BaseGlanceWidgetReceiver : GlanceAppWidgetReceiver() {
+
+    override fun onReceive(context: Context, intent: Intent) {
+        when (intent.action) {
+            ACTION_OPEN -> handleActionOpen(context, intent)
+            else -> super.onReceive(context, intent)
+        }
+    }
+}
+
+internal const val GLANCE_TIMEOUT = 40_000L  // Max at ~45_000L
+
+@Composable
+internal fun WebLinkImage(
+    context: Context,
+    webShot: WebShooter.WebShot,
+    receiver: Class<out BroadcastReceiver>
+) {
+    val intent = Intent(ACTION_OPEN, webShot.url.toUri(), context, receiver)
+    Image(
+        provider = ImageProvider(webShot.bitmap),
+        contentDescription = "WebShot",
+        modifier = GlanceModifier.clickable(actionSendBroadcast(intent))
+    )
+}
+
+@Composable
+private fun ErrorContent() {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = GlanceModifier
+            .fillMaxSize()
+            .background(Color.White)
+            .appWidgetBackground()
+    ) {
+        Text(
+            text = "Error",
+            style = TextDefaults.defaultTextStyle.copy(
+                color = ColorProvider(Color.Red),
+                fontSize = 22.sp
+            )
+        )
+    }
+}
+
+@Composable
+private fun TimeoutMessage() {
+    Box(
+        modifier = GlanceModifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "Timeout",
+            style = TextDefaults.defaultTextStyle.copy(fontSize = 22.sp)
+        )
+    }
+}
+
 @Composable
 private fun ReloadButton(onClick: () -> Unit) {
     Box(modifier = GlanceModifier.padding(4.dp)) {
@@ -147,65 +204,3 @@ private fun ReloadButton(onClick: () -> Unit) {
         }
     }
 }
-
-@Composable
-private fun ErrorContent() {
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .background(Color.White)
-            .appWidgetBackground()
-    ) {
-        Text(
-            text = "Error",
-            style = TextDefaults.defaultTextStyle.copy(
-                color = ColorProvider(Color.Red),
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp
-            )
-        )
-    }
-}
-
-@Composable
-private fun TimeoutMessage() {
-    Box(
-        modifier = GlanceModifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "Timeout",
-            style = TextDefaults.defaultTextStyle.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 22.sp
-            )
-        )
-    }
-}
-
-@Composable
-internal fun WebLinkImage(
-    context: Context,
-    webShot: WebShooter.WebShot,
-    receiver: Class<out BroadcastReceiver>
-) {
-    val intent = Intent(ACTION_OPEN, webShot.url.toUri(), context, receiver)
-    Image(
-        provider = ImageProvider(webShot.bitmap),
-        contentDescription = "WebShot",
-        modifier = GlanceModifier.clickable(actionSendBroadcast(intent))
-    )
-}
-
-abstract class BaseGlanceWidgetReceiver : GlanceAppWidgetReceiver() {
-
-    override fun onReceive(context: Context, intent: Intent) {
-        when (intent.action) {
-            ACTION_OPEN -> handleActionOpen(context, intent)
-            else -> super.onReceive(context, intent)
-        }
-    }
-}
-
-internal const val GLANCE_TIMEOUT = 40_000L  // Max at ~45_000L

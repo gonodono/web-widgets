@@ -5,16 +5,14 @@
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    tools:ignore="HardcodedText"
-    tools:viewBindingIgnore="true">
+    tools:ignore="HardcodedText">
 
     <ImageView
         android:id="@+id/image"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:contentDescription="WebShot"
-        android:scaleType="fitCenter"
-        tools:viewBindingIgnore="true" />
+        android:scaleType="fitCenter" />
 
     <TextView
         android:id="@+id/continues"
@@ -27,7 +25,6 @@
         android:text="Continues…"
         android:textAppearance="?android:textAppearanceLarge"
         android:textColor="@color/blue"
-        android:textStyle="bold"
         android:visibility="gone" />
 
 </FrameLayout>

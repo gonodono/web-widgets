@@ -17,8 +17,9 @@ import com.gonodono.webwidgets.handleActionOpen
 import com.gonodono.webwidgets.view.ACTION_RELOAD
 import com.gonodono.webwidgets.view.appWidgetIdExtra
 import com.gonodono.webwidgets.view.appWidgetManager
+import com.gonodono.webwidgets.view.getUrl
 import com.gonodono.webwidgets.view.setUrl
-import com.gonodono.webwidgets.view.updateAppWidgetIds
+import com.gonodono.webwidgets.view.setWidgetsRestored
 import com.gonodono.webwidgets.view.urlKey
 import com.gonodono.webwidgets.view.widgetStates
 
@@ -26,15 +27,23 @@ class ViewScrollWidgetProvider : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
+            ACTION_OPEN -> handleActionOpen(context, intent)
             ACTION_RELOAD -> {
                 val appWidgetId = intent.appWidgetIdExtra
                 setUrl(context, appWidgetId, null)
                 context.appWidgetManager.notifyListChanged(appWidgetId)
             }
 
-            ACTION_OPEN -> handleActionOpen(context, intent)
             else -> super.onReceive(context, intent)
         }
+    }
+
+    override fun onUpdate(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetIds: IntArray
+    ) {
+        appWidgetIds.forEach { updateWidget(context, appWidgetManager, it) }
     }
 
     override fun onAppWidgetOptionsChanged(
@@ -46,17 +55,9 @@ class ViewScrollWidgetProvider : AppWidgetProvider() {
         appWidgetManager.notifyListChanged(appWidgetId)
     }
 
-    override fun onUpdate(
-        context: Context,
-        appWidgetManager: AppWidgetManager,
-        appWidgetIds: IntArray
-    ) {
-        appWidgetIds.forEach { id -> update(context, appWidgetManager, id) }
-    }
-
     override fun onDeleted(context: Context, appWidgetIds: IntArray) {
         context.widgetStates.edit().apply {
-            appWidgetIds.forEach { id -> remove(urlKey(id)) }
+            appWidgetIds.forEach { remove(urlKey(it)) }
         }.apply()
     }
 
@@ -65,7 +66,15 @@ class ViewScrollWidgetProvider : AppWidgetProvider() {
         oldWidgetIds: IntArray,
         newWidgetIds: IntArray
     ) {
-        updateAppWidgetIds(context, oldWidgetIds, newWidgetIds)
+        context.widgetStates.edit().run {
+            oldWidgetIds.forEachIndexed { index, oldId ->
+                putString(urlKey(newWidgetIds[index]), getUrl(context, oldId))
+                remove(urlKey(oldId))
+            }
+            apply()
+        }
+        setWidgetsRestored(context, newWidgetIds)
+        onUpdate(context, context.appWidgetManager, newWidgetIds)
     }
 }
 
@@ -73,7 +82,7 @@ internal fun AppWidgetManager.notifyListChanged(appWidgetId: Int) {
     notifyAppWidgetViewDataChanged(appWidgetId, R.id.list)
 }
 
-private fun update(
+private fun updateWidget(
     context: Context,
     appWidgetManager: AppWidgetManager,
     appWidgetId: Int
@@ -84,7 +93,6 @@ private fun update(
     adapter.setData(adapter.toUri(Intent.URI_INTENT_SCHEME).toUri())
     views.setRemoteAdapter(R.id.list, adapter)
     views.setEmptyView(R.id.list, R.id.progress)
-
     val open = Intent(
         ACTION_OPEN,
         null,
@@ -100,7 +108,6 @@ private fun update(
             FLAG_MUTABLE or FLAG_UPDATE_CURRENT
         ),
     )
-
     val reload = Intent(
         ACTION_RELOAD,
         null,
@@ -117,6 +124,5 @@ private fun update(
             FLAG_IMMUTABLE
         )
     )
-
     appWidgetManager.updateAppWidget(appWidgetId, views)
 }

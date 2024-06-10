@@ -2,23 +2,24 @@ package com.gonodono.webwidgets.view.scroll
 
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import android.util.Size
 import android.view.View
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 import androidx.core.net.toUri
+import com.gonodono.webwidgets.BuildConfig
 import com.gonodono.webwidgets.R
+import com.gonodono.webwidgets.TAG
 import com.gonodono.webwidgets.WIKIPEDIA_RANDOM_URL
 import com.gonodono.webwidgets.WebShooter
-import com.gonodono.webwidgets.view.SERVICE_TIMEOUT
 import com.gonodono.webwidgets.view.appWidgetIdExtra
 import com.gonodono.webwidgets.view.appWidgetManager
-import com.gonodono.webwidgets.view.busyViews
-import com.gonodono.webwidgets.view.errorViews
 import com.gonodono.webwidgets.view.getUrl
 import com.gonodono.webwidgets.view.setUrl
 import com.gonodono.webwidgets.view.widgetSize
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 
 private class ViewScrollWidgetFactory(
     private val context: Context,
@@ -27,13 +28,13 @@ private class ViewScrollWidgetFactory(
 
     private val webShooter = WebShooter(context)
 
-    override fun onCreate() {
-        webShooter.initialize()
-    }
-
     private var listItem: RemoteViews? = null
 
     private var currentSize = Size(0, 0)
+
+    override fun onCreate() {
+        webShooter.initialize()
+    }
 
     override fun onDataSetChanged() {
         if (!webShooter.canDraw) {
@@ -49,23 +50,30 @@ private class ViewScrollWidgetFactory(
             return
         }
 
-        val newSize = context.widgetSize(appWidgetId)
-        if (listItem == null || currentSize != newSize) {
-            val webShot = runBlocking {
-                // Apparently RemoteViews straight out of a collection Factory
-                // aren't checked for the max allowed image size. Might want to
-                // take extra precautions if using a bigger size in production.
-                webShooter.takeShot(url, SERVICE_TIMEOUT, newSize, false, 2.0F)
+        val size = context.widgetSize(appWidgetId)
+        if (listItem == null || currentSize != size) {
+            val result = runBlocking {
+                withTimeoutOrNull(SERVICE_TIMEOUT) {
+                    // Apparently RemoteViews straight from a collection Factory
+                    // aren't checked for the max allowed image size. Might want
+                    // to take extra precautions if using a bigger size in prod.
+                    webShooter.takeShot(url, size, false, 2.0F)
+                }
             }
-            listItem = when {
-                webShot != null -> {
-                    setUrl(context, appWidgetId, webShot.url)
-                    itemViews(context, webShot, appWidgetId)
+            listItem = when (result) {
+                is WebShooter.WebShot -> {
+                    setUrl(context, appWidgetId, result.url)
+                    itemViews(context, result, appWidgetId)
                 }
 
-                else -> timeoutViews(context)
+                is WebShooter.Error -> {
+                    if (BuildConfig.DEBUG) Log.e(TAG, result.message)
+                    errorViews(context)
+                }
+
+                null -> timeoutViews(context)
             }
-            currentSize = newSize
+            currentSize = size
         }
     }
 
@@ -93,7 +101,7 @@ private fun itemViews(
     context: Context,
     webShot: WebShooter.WebShot,
     appWidgetId: Int
-) = RemoteViews(context.packageName, R.layout.scroll_widget_item).apply {
+) = RemoteViews(context.packageName, R.layout.widget_scroll_item).apply {
     setImageViewBitmap(R.id.image, webShot.bitmap)
     val click = Intent().setData(webShot.url.toUri())
     click.appWidgetIdExtra = appWidgetId
@@ -101,6 +109,17 @@ private fun itemViews(
     if (webShot.overflows) setViewVisibility(R.id.continues, View.VISIBLE)
 }
 
-private fun timeoutViews(context: Context) =
-    RemoteViews(context.packageName, R.layout.widget_text)
-        .apply { setTextViewText(R.id.text, "Timeout") }
+private fun busyViews(context: Context): RemoteViews =
+    RemoteViews(context.packageName, R.layout.widget_scroll_busy)
+
+private fun timeoutViews(context: Context): RemoteViews =
+    RemoteViews(context.packageName, R.layout.widget_scroll_text).apply {
+        setTextViewText(R.id.text, context.getText(R.string.timeout))
+    }
+
+private fun errorViews(context: Context): RemoteViews =
+    RemoteViews(context.packageName, R.layout.widget_scroll_text).apply {
+        setTextViewText(R.id.text, context.getText(R.string.error))
+    }
+
+private const val SERVICE_TIMEOUT = 40_000L  // Matches GLANCE_TIMEOUT

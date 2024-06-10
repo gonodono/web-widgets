@@ -16,28 +16,33 @@ import android.view.WindowManager.LayoutParams.TYPE_SYSTEM_OVERLAY
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
-import androidx.compose.runtime.Immutable
 import androidx.core.graphics.applyCanvas
 import androidx.core.graphics.withScale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
-import kotlinx.coroutines.isActive
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.coroutines.cancellation.CancellationException
+import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
 
-internal class WebShooter(private val context: Context) {
+internal class WebShooter(context: Context) {
 
-    @Immutable
-    class WebShot(
+    sealed interface Result
+
+    data class WebShot(
         val url: String,
         val bitmap: Bitmap,
         val overflows: Boolean
-    )
+    ) : Result
+
+    data class Error(val message: String) : Result
+
+    private val context: Context = context.applicationContext
 
     private var frameLayout: FrameLayout? = null
 
@@ -49,23 +54,20 @@ internal class WebShooter(private val context: Context) {
     fun initialize() = runBlocking(Dispatchers.Main.immediate) {
         val frame = FrameLayout(context)
         if (frame.addToWindowManager() && frame.removeFromWindowManager()) {
+            webView = WebView(context).also { frame.addView(it) }
             frameLayout = frame
-            webView = WebView(frame.context).also { frame.addView(it) }
             canDraw = true
         }
     }
 
     private val mutex = Mutex()
 
-    // It's assumed that null means timeout; almost everything else throws.
-    // Better failure details could be relayed by using some kind of Result type.
     suspend fun takeShot(
         url: String,
-        timeout: Long,
         targetSize: Size,
         fitTargetHeight: Boolean,
         screenAreaMultiplier: Float = 1.45F  // Max 1.5F
-    ): WebShot? = mutex.withLock {
+    ): Result {
 
         check(canDraw) { "Cannot draw." }
         check(url.isNotBlank()) { "Blank or empty URL" }
@@ -73,39 +75,37 @@ internal class WebShooter(private val context: Context) {
             "Invalid size: $targetSize"
         }
 
-        val frame = frameLayout!!
-        check(frame.addToWindowManager()) { "WindowManager error" }
+        mutex.withLock {
+            val frame = frameLayout!!
+            if (frame.addToWindowManager()) try {
 
-        try {
-            val web = webView!!
-            withTimeoutOrNull(timeout) {
+                val web = webView!!
                 val current = web.awaitLoadUrl(url)
-                checkNotNull(current) { "WebView load error" }
+                coroutineContext.ensureActive()
+                if (current == null) return Error("WebView load error")
 
                 val imageSpecs = web.performLayouts(
                     targetSize,
                     fitTargetHeight,
                     screenAreaMultiplier
                 )
-                check(imageSpecs.height > 0) { "Layout error" }
+                coroutineContext.ensureActive()
+                if (imageSpecs.height <= 0) return Error("Layout error")
 
-                when {
-                    isActive -> {
-                        val bitmap = web.drawToBitmap(
-                            imageSpecs.width,
-                            imageSpecs.height,
-                            imageSpecs.downScale
-                        )
-                        WebShot(current, bitmap, imageSpecs.overflows)
-                    }
+                val bitmap = web.drawToBitmap(
+                    imageSpecs.width,
+                    imageSpecs.height,
+                    imageSpecs.downScale
+                )
+                coroutineContext.ensureActive()
 
-                    else -> null
+                return WebShot(current, bitmap, imageSpecs.overflows)
+            } finally {
+                withContext(NonCancellable) {
+                    frame.removeFromWindowManager()
                 }
             }
-        } finally {
-            withContext(NonCancellable) {
-                frame.removeFromWindowManager()
-            }
+            else return Error("WindowManager error")
         }
     }
 
@@ -115,8 +115,8 @@ internal class WebShooter(private val context: Context) {
         screenAreaMultiplier: Float
     ): ImageSpecs = withContext(Dispatchers.Main) {
 
-        val screenSize = context.screenSize()
         val imageWidth = targetSize.width
+        val screenSize = context.screenSize()
         val downScale = imageWidth.toFloat() / screenSize.width
 
         val imageHeight: Int
@@ -158,6 +158,8 @@ internal suspend fun View.addToWindowManager(): Boolean =
         try {
             context.windowManager.addView(this@addToWindowManager, windowParams)
             true
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             if (BuildConfig.DEBUG) Log.e(TAG, "Error adding View", e)
             false
@@ -179,6 +181,8 @@ internal suspend fun View.removeFromWindowManager(): Boolean =
         try {
             context.windowManager.removeView(this@removeFromWindowManager)
             true
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             if (BuildConfig.DEBUG) Log.e(TAG, "Error removing View", e)
             false
@@ -216,9 +220,10 @@ internal suspend fun WebView.drawToBitmap(
     width: Int,
     height: Int,
     downScale: Float
-) = withContext(Dispatchers.Default) {
-    Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        .applyCanvas { withScale(downScale, downScale) { draw(this) } }
+): Bitmap = withContext(Dispatchers.Default) {
+    Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).applyCanvas {
+        withScale(downScale, downScale) { this@drawToBitmap.draw(this) }
+    }
 }
 
 internal fun Context.screenSize(): Size =

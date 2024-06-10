@@ -19,12 +19,12 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:background="#E8FFFFFF"
+        android:background="@color/sheer_white"
         android:gravity="center"
         android:paddingVertical="2dp"
         android:text="Continues…"
         android:textAppearance="?android:textAppearanceLarge"
-        android:textColor="@color/blue"
+        android:textColor="@color/soft_blue"
         android:visibility="gone" />
 
 </FrameLayout>

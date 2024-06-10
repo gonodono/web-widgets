@@ -17,6 +17,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextAlign
 import androidx.glance.text.TextDefaults
 import androidx.glance.unit.ColorProvider
+import com.gonodono.webwidgets.R
 import com.gonodono.webwidgets.WebShooter
 import com.gonodono.webwidgets.glance.BaseGlanceWidget
 import com.gonodono.webwidgets.glance.BaseGlanceWidgetReceiver
@@ -31,7 +32,10 @@ private class GlanceScrollWidget : BaseGlanceWidget() {
         LazyColumn {
             item {
                 when {
-                    webShot.overflows -> OverflowImage(context, webShot)
+                    webShot.overflows -> OverflowImage(
+                        context = context,
+                        webShot = webShot
+                    )
                     else -> WebLinkImage(
                         context = context,
                         webShot = webShot,
@@ -63,7 +67,7 @@ private fun OverflowImage(
             ),
             modifier = GlanceModifier
                 .fillMaxWidth()
-                .background(Color(0xE8FFFFFF))
+                .background(R.color.sheer_white)
                 .padding(top = 2.dp, bottom = 2.dp)
         )
     }

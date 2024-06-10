@@ -6,11 +6,14 @@ import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.view.View
+import android.util.Log
+import android.util.Size
 import android.widget.RemoteViews
 import androidx.core.net.toUri
 import com.gonodono.webwidgets.ACTION_OPEN
+import com.gonodono.webwidgets.BuildConfig
 import com.gonodono.webwidgets.R
+import com.gonodono.webwidgets.TAG
 import com.gonodono.webwidgets.WIKIPEDIA_RANDOM_URL
 import com.gonodono.webwidgets.WebShooter
 import com.gonodono.webwidgets.handleActionOpen
@@ -20,13 +23,14 @@ import com.gonodono.webwidgets.view.appWidgetIdExtra
 import com.gonodono.webwidgets.view.appWidgetManager
 import com.gonodono.webwidgets.view.busyViews
 import com.gonodono.webwidgets.view.doAsync
-import com.gonodono.webwidgets.view.errorViews
 import com.gonodono.webwidgets.view.getUrl
 import com.gonodono.webwidgets.view.setUrl
-import com.gonodono.webwidgets.view.setWidgetsRestored
+import com.gonodono.webwidgets.view.show
+import com.gonodono.webwidgets.view.updateAppWidgets
 import com.gonodono.webwidgets.view.urlKey
 import com.gonodono.webwidgets.view.widgetSize
 import com.gonodono.webwidgets.view.widgetStates
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
 
 class ViewSimpleWidgetProvider : AppWidgetProvider() {
@@ -75,20 +79,32 @@ class ViewSimpleWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
-        val webShooter = WebShooter(context).apply { initialize() }
-        val initial = when {
-            webShooter.canDraw -> busyViews(context)
-            else -> errorViews(context)
-        }
-        appWidgetIds.forEach { id ->
-            appWidgetManager.updateAppWidget(id, initial)
-        }
-        if (!webShooter.canDraw) return
-
         doAsync {
-            withTimeoutOrNull(RECEIVER_TIMEOUT) {
-                appWidgetIds.forEach { id ->
-                    updateWidget(context, appWidgetManager, id, webShooter)
+            val webShooter = WebShooter(context).apply { initialize() }
+            val initial = when {
+                webShooter.canDraw -> busyViews(context)
+                else -> errorViews(context)
+            }
+            appWidgetManager.updateAppWidgets(appWidgetIds, initial)
+
+            if (webShooter.canDraw) {
+                val views = arrayOfNulls<RemoteViews>(appWidgetIds.size)
+                withTimeoutOrNull(RECEIVER_TIMEOUT) {
+                    appWidgetIds.forEachIndexed { index, id ->
+                        if (!isActive) return@withTimeoutOrNull
+                        val size = context.widgetSize(id)
+                        views[index] = if (size.width > 0 && size.height > 0) {
+                            contentViews(context, webShooter, id, size)
+                        } else {
+                            initial  // Leave busy.
+                        }
+                    }
+                }
+                appWidgetIds.forEachIndexed { index, id ->
+                    appWidgetManager.updateAppWidget(
+                        id,
+                        views[index] ?: timeoutViews(context, id)
+                    )
                 }
             }
         }
@@ -102,65 +118,27 @@ class ViewSimpleWidgetProvider : AppWidgetProvider() {
             }
         }.apply()
     }
-
-    override fun onRestored(
-        context: Context,
-        oldWidgetIds: IntArray,
-        newWidgetIds: IntArray
-    ) {
-        context.widgetStates.edit().run {
-            oldWidgetIds.forEachIndexed { index, oldId ->
-                val newId = newWidgetIds[index]
-                if (isInitialized(context, oldId)) {
-                    putBoolean(initializedKey(newId), true)
-                    remove(initializedKey(oldId))
-                }
-                putString(urlKey(newId), getUrl(context, oldId))
-                remove(urlKey(oldId))
-            }
-            apply()
-        }
-        setWidgetsRestored(context, newWidgetIds)
-        onUpdate(context, context.appWidgetManager, newWidgetIds)
-    }
 }
 
-private suspend fun updateWidget(
+private suspend fun contentViews(
     context: Context,
-    appWidgetManager: AppWidgetManager,
+    webShooter: WebShooter,
     appWidgetId: Int,
-    webShooter: WebShooter
-) {
-    val size = context.widgetSize(appWidgetId)
-    val views = when {
-        size.width > 0 && size.height > 0 -> {
-            val url = getUrl(context, appWidgetId) ?: WIKIPEDIA_RANDOM_URL
-            val webShot = webShooter.takeShot(url, RECEIVER_TIMEOUT, size, true)
-            if (webShot != null) setUrl(context, appWidgetId, webShot.url)
-            mainViews(context, appWidgetId, webShot)
-        }
-
-        else -> busyViews(context)
-    }
-    appWidgetManager.updateAppWidget(appWidgetId, views)
-}
-
-private fun mainViews(
-    context: Context,
-    appWidgetId: Int,
-    webShot: WebShooter.WebShot?
-) = RemoteViews(context.packageName, R.layout.simple_widget).also { views ->
-    when {
-        webShot != null -> {
-            views.setImageViewBitmap(R.id.image, webShot.bitmap)
+    size: Size
+): RemoteViews {
+    val views = simpleWidgetViews(context, appWidgetId)
+    val url = getUrl(context, appWidgetId) ?: WIKIPEDIA_RANDOM_URL
+    when (val result = webShooter.takeShot(url, size, true)) {
+        is WebShooter.WebShot -> {
+            setUrl(context, appWidgetId, result.url)
+            views.setImageViewBitmap(R.id.image, result.bitmap)
             val open = Intent(
                 ACTION_OPEN,
-                webShot.url.toUri(),
+                result.url.toUri(),
                 context,
                 ViewSimpleWidgetProvider::class.java
             )
             open.appWidgetIdExtra = appWidgetId
-            views.setViewVisibility(R.id.image, View.VISIBLE)
             views.setOnClickPendingIntent(
                 R.id.image,
                 PendingIntent.getBroadcast(
@@ -170,29 +148,48 @@ private fun mainViews(
                     PendingIntent.FLAG_IMMUTABLE
                 )
             )
+            views.show(R.id.image)
         }
 
-        else -> views.setViewVisibility(R.id.timeout, View.VISIBLE)
+        is WebShooter.Error -> {
+            if (BuildConfig.DEBUG) Log.e(TAG, result.message)
+            views.show(R.id.error)
+        }
     }
-    val reload = Intent(
-        ACTION_RELOAD,
-        null,
-        context,
-        ViewSimpleWidgetProvider::class.java
-    )
-    reload.appWidgetIdExtra = appWidgetId
-    views.setOnClickPendingIntent(
-        R.id.reload,
-        PendingIntent.getBroadcast(
-            context,
-            appWidgetId,
-            reload,
-            PendingIntent.FLAG_IMMUTABLE
-        )
-    )
+    return views
 }
 
-private fun isInitialized(context: Context, appWidgetId: Int) =
+private fun timeoutViews(context: Context, appWidgetId: Int): RemoteViews =
+    simpleWidgetViews(context, appWidgetId).apply { show(R.id.timeout) }
+
+private fun simpleWidgetViews(context: Context, appWidgetId: Int): RemoteViews =
+    RemoteViews(context.packageName, R.layout.widget_simple).apply {
+        val reload = Intent(
+            ACTION_RELOAD,
+            null,
+            context,
+            ViewSimpleWidgetProvider::class.java
+        )
+        reload.appWidgetIdExtra = appWidgetId
+        setOnClickPendingIntent(
+            R.id.reload,
+            PendingIntent.getBroadcast(
+                context,
+                appWidgetId,
+                reload,
+                PendingIntent.FLAG_IMMUTABLE
+            )
+        )
+        show(R.id.reload)
+    }
+
+private fun errorViews(context: Context): RemoteViews =
+    RemoteViews(context.packageName, R.layout.widget_text).apply {
+        val text = context.getText(R.string.error)
+        setTextViewText(android.R.id.background, text)
+    }
+
+private fun isInitialized(context: Context, appWidgetId: Int): Boolean =
     context.widgetStates.getBoolean(initializedKey(appWidgetId), false)
 
 private fun setInitialized(context: Context, appWidgetId: Int) {

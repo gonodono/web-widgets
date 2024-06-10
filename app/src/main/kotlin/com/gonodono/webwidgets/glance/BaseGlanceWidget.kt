@@ -3,6 +3,7 @@ package com.gonodono.webwidgets.glance
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -36,7 +37,9 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextDefaults
 import androidx.glance.unit.ColorProvider
 import com.gonodono.webwidgets.ACTION_OPEN
+import com.gonodono.webwidgets.BuildConfig
 import com.gonodono.webwidgets.R
+import com.gonodono.webwidgets.TAG
 import com.gonodono.webwidgets.WIKIPEDIA_RANDOM_URL
 import com.gonodono.webwidgets.WebShooter
 import com.gonodono.webwidgets.handleActionOpen
@@ -44,6 +47,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import android.util.Size as AndroidSize
 
 internal abstract class BaseGlanceWidget : GlanceAppWidget() {
@@ -60,6 +64,7 @@ internal abstract class BaseGlanceWidget : GlanceAppWidget() {
         data object Loading : State
         data class Complete(val webShot: WebShooter.WebShot) : State
         data object Timeout : State
+        data object Error : State
     }
 
     private val scope = CoroutineScope(SupervisorJob())
@@ -72,21 +77,15 @@ internal abstract class BaseGlanceWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val webShooter = WebShooter(context).apply { initialize() }
-        provideContent {
-            when {
-                webShooter.canDraw -> MainContent(context, webShooter)
-                else -> ErrorContent()
-            }
-        }
+        provideContent { MainContent(context, webShooter) }
     }
 
     @Composable
     private fun MainContent(context: Context, webShooter: WebShooter) {
-        val state = widgetState
         val size = with(Density(context)) { LocalSize.current.toSize() }
             .run { AndroidSize(width.toInt(), height.toInt()) }
         Box(
-            contentAlignment = when (state) {
+            contentAlignment = when (widgetState) {
                 State.Loading -> Alignment.Center
                 else -> Alignment.BottomEnd
             },
@@ -95,31 +94,47 @@ internal abstract class BaseGlanceWidget : GlanceAppWidget() {
                 .background(Color.White)
                 .appWidgetBackground()
         ) {
+            val state = widgetState
             when (state) {
                 State.Loading -> CircularProgressIndicator()
                 is State.Complete -> Content(context, state.webShot)
                 State.Timeout -> TimeoutMessage()
+                State.Error -> ErrorMessage()
             }
-            if (state != State.Loading) ReloadButton {
-                url = null
-                update(webShooter, size)
+            if (state !is State.Loading && webShooter.canDraw) {
+                ReloadButton { url = null; update(webShooter, size) }
             }
         }
+
         LaunchedEffect(size) { update(webShooter, size) }
     }
 
     private fun update(webShooter: WebShooter, size: AndroidSize) {
-        widgetState = State.Loading
         scope.launch {
-            val webShot = webShooter.takeShot(
-                url ?: WIKIPEDIA_RANDOM_URL,
-                GLANCE_TIMEOUT,
-                size,
-                imageHeightFitsWidget
-            )
-            widgetState = when (webShot) {
-                null -> State.Timeout
-                else -> State.Complete(webShot).also { url = webShot.url }
+            if (webShooter.canDraw) {
+                widgetState = State.Loading
+                val result = withTimeoutOrNull(GLANCE_TIMEOUT) {
+                    webShooter.takeShot(
+                        url ?: WIKIPEDIA_RANDOM_URL,
+                        size,
+                        imageHeightFitsWidget
+                    )
+                }
+                widgetState = when (result) {
+                    is WebShooter.WebShot -> {
+                        url = result.url
+                        State.Complete(result)
+                    }
+
+                    is WebShooter.Error -> {
+                        if (BuildConfig.DEBUG) Log.e(TAG, result.message)
+                        State.Error
+                    }
+
+                    null -> State.Timeout
+                }
+            } else {
+                widgetState = State.Error
             }
         }
     }
@@ -156,18 +171,15 @@ internal fun WebLinkImage(
 }
 
 @Composable
-private fun ErrorContent() {
+internal fun TimeoutMessage() {
     Box(
         contentAlignment = Alignment.Center,
-        modifier = GlanceModifier
-            .fillMaxSize()
-            .background(Color.White)
-            .appWidgetBackground()
+        modifier = GlanceModifier.fillMaxSize()
     ) {
         Text(
-            text = "Error",
+            text = "Timeout",
             style = TextDefaults.defaultTextStyle.copy(
-                color = ColorProvider(Color.Red),
+                color = ColorProvider(Color.Magenta),
                 fontSize = 22.sp
             )
         )
@@ -175,14 +187,17 @@ private fun ErrorContent() {
 }
 
 @Composable
-private fun TimeoutMessage() {
+internal fun ErrorMessage() {
     Box(
-        modifier = GlanceModifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
+        modifier = GlanceModifier.fillMaxSize()
     ) {
         Text(
-            text = "Timeout",
-            style = TextDefaults.defaultTextStyle.copy(fontSize = 22.sp)
+            text = "Error",
+            style = TextDefaults.defaultTextStyle.copy(
+                color = ColorProvider(Color.Red),
+                fontSize = 22.sp
+            )
         )
     }
 }

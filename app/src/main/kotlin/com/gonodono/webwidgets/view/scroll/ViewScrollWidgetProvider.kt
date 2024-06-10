@@ -17,9 +17,8 @@ import com.gonodono.webwidgets.handleActionOpen
 import com.gonodono.webwidgets.view.ACTION_RELOAD
 import com.gonodono.webwidgets.view.appWidgetIdExtra
 import com.gonodono.webwidgets.view.appWidgetManager
-import com.gonodono.webwidgets.view.getUrl
+import com.gonodono.webwidgets.view.doAsync
 import com.gonodono.webwidgets.view.setUrl
-import com.gonodono.webwidgets.view.setWidgetsRestored
 import com.gonodono.webwidgets.view.urlKey
 import com.gonodono.webwidgets.view.widgetStates
 
@@ -43,7 +42,11 @@ class ViewScrollWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
-        appWidgetIds.forEach { updateWidget(context, appWidgetManager, it) }
+        doAsync {
+            appWidgetIds.forEach { id ->
+                updateWidget(context, appWidgetManager, id)
+            }
+        }
     }
 
     override fun onAppWidgetOptionsChanged(
@@ -60,22 +63,6 @@ class ViewScrollWidgetProvider : AppWidgetProvider() {
             appWidgetIds.forEach { remove(urlKey(it)) }
         }.apply()
     }
-
-    override fun onRestored(
-        context: Context,
-        oldWidgetIds: IntArray,
-        newWidgetIds: IntArray
-    ) {
-        context.widgetStates.edit().run {
-            oldWidgetIds.forEachIndexed { index, oldId ->
-                putString(urlKey(newWidgetIds[index]), getUrl(context, oldId))
-                remove(urlKey(oldId))
-            }
-            apply()
-        }
-        setWidgetsRestored(context, newWidgetIds)
-        onUpdate(context, context.appWidgetManager, newWidgetIds)
-    }
 }
 
 internal fun AppWidgetManager.notifyListChanged(appWidgetId: Int) {
@@ -87,9 +74,9 @@ private fun updateWidget(
     appWidgetManager: AppWidgetManager,
     appWidgetId: Int
 ) {
-    val views = RemoteViews(context.packageName, R.layout.scroll_widget_main)
+    val views = RemoteViews(context.packageName, R.layout.widget_scroll_main)
     val adapter = Intent(context, ViewScrollWidgetService::class.java)
-    adapter.appWidgetIdExtra = appWidgetId
+    adapter.appWidgetIdExtra = appWidgetId // <- Must do before toUri().
     adapter.setData(adapter.toUri(Intent.URI_INTENT_SCHEME).toUri())
     views.setRemoteAdapter(R.id.list, adapter)
     views.setEmptyView(R.id.list, R.id.progress)

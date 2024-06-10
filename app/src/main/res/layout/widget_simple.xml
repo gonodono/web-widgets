@@ -6,15 +6,23 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/white"
-    android:orientation="vertical"
     tools:ignore="HardcodedText">
 
     <TextView
         android:id="@+id/timeout"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="center"
-        android:text="Timeout"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="@string/timeout"
+        android:textAppearance="?android:textAppearanceLarge"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/error"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="@string/error"
         android:textAppearance="?android:textAppearanceLarge"
         android:visibility="gone" />
 
@@ -27,11 +35,11 @@
 
     <ImageButton
         android:id="@+id/reload"
+        android:src="@drawable/reload"
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_gravity="bottom|end"
         android:contentDescription="Reload"
-        android:src="@drawable/reload"
-        android:textAllCaps="false" />
+        android:visibility="gone" />
 
 </FrameLayout>

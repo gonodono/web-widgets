@@ -15,7 +15,10 @@ import com.gonodono.webwidgets.awaitLoadUrl
 import com.gonodono.webwidgets.removeFromWindowManager
 import com.gonodono.webwidgets.screenSize
 import com.gonodono.webwidgets.view.RECEIVER_TIMEOUT
+import com.gonodono.webwidgets.view.busyViews
 import com.gonodono.webwidgets.view.doAsync
+import com.gonodono.webwidgets.view.show
+import com.gonodono.webwidgets.view.updateAppWidgets
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
@@ -27,8 +30,6 @@ class ViewMinimalWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
-        val busyViews = RemoteViews(context.packageName, R.layout.widget_busy)
-        updateViews(appWidgetManager, appWidgetIds, busyViews)
         doAsync { updateWidgets(context, appWidgetManager, appWidgetIds) }
     }
 
@@ -37,7 +38,10 @@ class ViewMinimalWidgetProvider : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
-        val bitmap = withTimeoutOrNull(RECEIVER_TIMEOUT) {
+        appWidgetManager.updateAppWidgets(appWidgetIds, busyViews(context))
+
+        val views = RemoteViews(context.packageName, R.layout.widget_simple)
+        withTimeoutOrNull(RECEIVER_TIMEOUT) {
             val frameLayout = FrameLayout(context)
             when {
                 frameLayout.addToWindowManager() -> try {
@@ -47,29 +51,17 @@ class ViewMinimalWidgetProvider : AppWidgetProvider() {
                     webView.awaitLoadUrl(WIKIPEDIA_RANDOM_URL)
                     val size = context.screenSize()
                     webView.awaitLayout(size.width, size.height / 2)
-                    webView.drawToBitmap()
+                    val bitmap = webView.drawToBitmap()
+                    views.setImageViewBitmap(R.id.image, bitmap)
+                    views.show(R.id.image)
                 } finally {
                     frameLayout.removeFromWindowManager()
                 }
 
-                else -> null
+                else -> views.show(R.id.error)
             }
-        }
-        val views = if (bitmap != null) {
-            RemoteViews(context.packageName, R.layout.widget_minimal)
-                .apply { setImageViewBitmap(R.id.image, bitmap) }
-        } else {
-            RemoteViews(context.packageName, R.layout.widget_text)
-                .apply { setTextViewText(R.id.text, "Error") }
-        }
-        updateViews(appWidgetManager, appWidgetIds, views)
-    }
+        } ?: views.show(R.id.timeout)
 
-    private fun updateViews(
-        appWidgetManager: AppWidgetManager,
-        appWidgetIds: IntArray,
-        rv: RemoteViews
-    ) {
-        appWidgetIds.forEach { appWidgetManager.updateAppWidget(it, rv) }
+        appWidgetManager.updateAppWidgets(appWidgetIds, views)
     }
 }

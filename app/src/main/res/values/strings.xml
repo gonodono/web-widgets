@@ -7,6 +7,7 @@
     <string name="glance_minimal">Glance Minimal</string>
     <string name="glance_simple">Glance Simple</string>
     <string name="glance_scroll">Glance Scroll</string>
-    <string name="webshot">WebShot</string>
+    <string name="timeout"><font color="magenta">Timeout</font></string>
+    <string name="error"><font color="red">Error</font></string>
 
 </resources>

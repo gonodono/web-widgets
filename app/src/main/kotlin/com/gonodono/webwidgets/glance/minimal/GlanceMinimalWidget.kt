@@ -18,18 +18,18 @@ import androidx.glance.appwidget.CircularProgressIndicator
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
-import androidx.glance.appwidget.appWidgetBackground
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
-import androidx.glance.text.Text
 import com.gonodono.webwidgets.WIKIPEDIA_RANDOM_URL
 import com.gonodono.webwidgets.addToWindowManager
 import com.gonodono.webwidgets.awaitLayout
 import com.gonodono.webwidgets.awaitLoadUrl
+import com.gonodono.webwidgets.glance.ErrorMessage
 import com.gonodono.webwidgets.glance.GLANCE_TIMEOUT
+import com.gonodono.webwidgets.glance.TimeoutMessage
 import com.gonodono.webwidgets.removeFromWindowManager
 import com.gonodono.webwidgets.screenSize
 import kotlinx.coroutines.Dispatchers
@@ -39,9 +39,10 @@ import kotlinx.coroutines.withTimeoutOrNull
 private class GlanceMinimalWidget : GlanceAppWidget() {
 
     private sealed interface State {
-        data object Error : State
         data object Loading : State
         data class Complete(val bitmap: Bitmap) : State
+        data object Timeout : State
+        data object Error : State
     }
 
     private var widgetState by mutableStateOf<State>(State.Loading)
@@ -52,18 +53,17 @@ private class GlanceMinimalWidget : GlanceAppWidget() {
         provideContent {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = GlanceModifier
-                    .fillMaxSize()
-                    .background(Color.LightGray)
-                    .appWidgetBackground()
+                modifier = GlanceModifier.fillMaxSize().background(Color.White)
             ) {
                 when (val state = widgetState) {
-                    State.Error -> Text("Error")
                     State.Loading -> CircularProgressIndicator()
                     is State.Complete -> Image(
                         provider = ImageProvider(state.bitmap),
                         contentDescription = "WebShot"
                     )
+
+                    State.Timeout -> TimeoutMessage()
+                    State.Error -> ErrorMessage()
                 }
             }
             LaunchedEffect(Unit) { update(context) }
@@ -72,7 +72,7 @@ private class GlanceMinimalWidget : GlanceAppWidget() {
 
     private suspend fun update(context: Context) {
         widgetState = State.Loading
-        val bitmap = withTimeoutOrNull(GLANCE_TIMEOUT) {
+        widgetState = withTimeoutOrNull(GLANCE_TIMEOUT) {
             val frameLayout = FrameLayout(context)
             when {
                 frameLayout.addToWindowManager() -> try {
@@ -82,18 +82,15 @@ private class GlanceMinimalWidget : GlanceAppWidget() {
                     webView.awaitLoadUrl(WIKIPEDIA_RANDOM_URL)
                     val size = context.screenSize()
                     webView.awaitLayout(size.width, size.height / 2)
-                    webView.drawToBitmap()
+                    val bitmap = webView.drawToBitmap()
+                    State.Complete(bitmap)
                 } finally {
                     frameLayout.removeFromWindowManager()
                 }
 
-                else -> null
+                else -> State.Error
             }
-        }
-        widgetState = when (bitmap) {
-            null -> State.Error
-            else -> State.Complete(bitmap)
-        }
+        } ?: State.Timeout
     }
 }
 

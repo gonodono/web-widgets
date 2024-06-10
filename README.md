@@ -16,7 +16,7 @@ there that I may have overlooked here, and vice versa.
 
 ## Overview
 
-+ All of the examples use the same overall method to generate their images. A
++ All of the examples use the same overall method to generate their images: a
   `WebView` is instantiated and, in order to enable rendering, attached to
   `WindowManager` inside a zero-by-zero `FrameLayout`. A page is then loaded,
   laid out, and drawn to a `Bitmap` that's displayed in the Widget, after which
@@ -26,14 +26,15 @@ there that I may have overlooked here, and vice versa.
 + Each framework has three versions: Minimal, Simple, and Scroll.
 
   + The Minimal ones are rather bare-bones; just enough to show as busy before
-    displaying a static image or an error.
+    displaying a static image or a failure message.
 
   + The Simple versions provide reload buttons, create more efficient images,
     and are clickable to allow opening their pages in a browser app.
 
   + The Scroll ones have the same features as the Simple, but the image is
-    created to be as tall as is allowed by the App Widget API's size limit, and
-    is then displayed as the only item in a `ListView` or `LazyColumn`.
+    created to be (almost) as tall as is allowed by the App Widget API's size
+    limit, and is then displayed as the only item in a `ListView` or
+    `LazyColumn`.
 
 + Neither framework's examples really do much as far as data persistence goes.
   The Glance versions manage to use only runtime variables, because
@@ -59,11 +60,11 @@ there that I may have overlooked here, and vice versa.
 
 ### Minimal
 
-The Minimal version simply displays a static image or an error message after
+The Minimal version simply displays a static image or an failure message after
 showing an indeterminate indicator while busy. The actual image is the same
-width as the screen and half its height, though it's obviously scaled down in the
-Widget. There's nothing special about the height measure; I cut it in half so it
-kinda fits OK in a 2x2 portrait Widget.
+width as the screen and half its height, though it's obviously scaled down in
+the Widget. There's nothing special about the height measure; I cut it in half
+so it kinda fits OK in a 2x2 portrait Widget.
 
 A coroutine is launched from the `AppWidgetProvider`'s `onUpdate()` to handle
 the page load, layout, and draw. It takes advantage of `BroadcastReceiver`'s
@@ -77,7 +78,7 @@ browser app. Also, this one creates `Bitmap`s that are sized to match the Widget
 rather than the screen, to cut down on overhead.
 
 This one launches a coroutine from `onUpdate()` just like the Minimal, with the
-same 10-second timeout, but its `WebView` operations and draw routine are all
+same ~10-second timeout, but its `WebView` operations and draw routine are all
 contained in the `WebShooter` class.
 
 ### Scroll
@@ -90,6 +91,14 @@ more complicated than it sounds. The only scrolling containers allowed in
 The `WebShooter` work is handled in the `RemoteViewsFactory`, so there's plenty
 of time available, but it's capped at 40 seconds here to match the timeout for
 the Glance Widgets.
+
+Because of the unique setup here, this one ends up with a slightly different UI
+if it errors or times out, as those messages are displayed as `ListView` items.
+Also, since the reload button is handled in the `Provider` but the `WebShooter`
+runs in the `Factory`, there's no easy way to disable that button if the shooter
+figures out it can't draw. This one is mainly demonstrating how to use the time
+available in the `Factory`, if that might be useful for your particular design,
+so I didn't go to too much trouble to ensure feature parity here.
 
 
 ## Glance

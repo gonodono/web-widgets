@@ -71,7 +71,6 @@ private class GlanceMinimalWidget : GlanceAppWidget() {
     }
 
     private suspend fun update(context: Context) {
-        widgetState = State.Loading
         widgetState = withTimeoutOrNull(GLANCE_TIMEOUT) {
             val frameLayout = FrameLayout(context)
             when {

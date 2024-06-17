@@ -1,7 +1,7 @@
 # Web Widgets
 
-Basic examples of putting rendered `WebView` content into an App Widget
-image along with various features, for both `RemoteViews` and Glance.
+Basic examples of putting rendered `WebView` content into App Widget images
+along with various features, for both `RemoteViews` and Glance.
 
 <p align="center">
 <img src="images/widgets.png"
@@ -93,7 +93,7 @@ of time available, but it's capped at 40 seconds here to match the timeout for
 the Glance Widgets.
 
 Because of the unique setup here, this one ends up with a slightly different UI
-if it errors or times out, as those messages are displayed as `ListView` items.
+if it errors or times out, as those messages are displayed in `ListView` items.
 Also, since the reload button is handled in the `Provider` but the `WebShooter`
 runs in the `Factory`, there's no easy way to disable that button if the shooter
 figures out it can't draw. This one is mainly demonstrating how to use the time

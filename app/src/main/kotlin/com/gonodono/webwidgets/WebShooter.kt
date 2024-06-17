@@ -42,6 +42,7 @@ internal class WebShooter(context: Context) {
 
     data class Error(val message: String) : Result
 
+
     private val context: Context = context.applicationContext
 
     private var frameLayout: FrameLayout? = null

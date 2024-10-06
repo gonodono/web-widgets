@@ -47,7 +47,6 @@ class ViewSimpleWidgetProvider : AppWidgetProvider() {
                     intArrayOf(appWidgetId)
                 )
             }
-
             else -> super.onReceive(context, intent)
         }
     }

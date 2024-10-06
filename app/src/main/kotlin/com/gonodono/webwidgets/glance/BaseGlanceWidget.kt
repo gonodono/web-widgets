@@ -125,12 +125,10 @@ internal abstract class BaseGlanceWidget : GlanceAppWidget() {
                         url = result.url
                         State.Complete(result)
                     }
-
                     is WebShooter.Error -> {
                         if (BuildConfig.DEBUG) Log.e(TAG, result.message)
                         State.Error
                     }
-
                     null -> State.Timeout
                 }
             } else {

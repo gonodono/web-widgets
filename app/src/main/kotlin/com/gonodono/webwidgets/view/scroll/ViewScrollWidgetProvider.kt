@@ -32,7 +32,6 @@ class ViewScrollWidgetProvider : AppWidgetProvider() {
                 setUrl(context, appWidgetId, null)
                 context.appWidgetManager.notifyListChanged(appWidgetId)
             }
-
             else -> super.onReceive(context, intent)
         }
     }

@@ -65,12 +65,10 @@ private class ViewScrollWidgetFactory(
                     setUrl(context, appWidgetId, result.url)
                     itemViews(context, result, appWidgetId)
                 }
-
                 is WebShooter.Error -> {
                     if (BuildConfig.DEBUG) Log.e(TAG, result.message)
                     errorViews(context)
                 }
-
                 null -> timeoutViews(context)
             }
             currentSize = size

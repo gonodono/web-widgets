@@ -70,7 +70,7 @@ internal class WebShooter(context: Context) {
         screenAreaMultiplier: Float = 1.45F  // Max 1.5F
     ): Result {
 
-        check(canDraw) { "Cannot draw." }
+        check(canDraw) { "Cannot draw" }
         check(url.isNotBlank()) { "Blank or empty URL" }
         check(targetSize.width > 0 && targetSize.height > 0) {
             "Invalid size: $targetSize"
@@ -83,7 +83,7 @@ internal class WebShooter(context: Context) {
                 val web = webView!!
                 val current = web.awaitLoadUrl(url)
                 coroutineContext.ensureActive()
-                if (current == null) return Error("WebView load error")
+                if (current == null) return Error("Load error")
 
                 val imageSpecs = web.performLayouts(
                     targetSize,
@@ -153,7 +153,6 @@ internal class WebShooter(context: Context) {
     )
 }
 
-// This fun and others below are internal for use in the minimal examples.
 internal suspend fun View.addToWindowManager(): Boolean =
     withContext(Dispatchers.Main) {
         try {

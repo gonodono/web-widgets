@@ -27,7 +27,6 @@
 
         <receiver
             android:name=".view.minimal.ViewMinimalWidgetProvider"
-            android:enabled="false"
             android:exported="true"
             android:label="@string/view_minimal">
             <intent-filter>
@@ -76,7 +75,6 @@
 
         <receiver
             android:name=".glance.minimal.GlanceMinimalWidgetReceiver"
-            android:enabled="false"
             android:exported="true"
             android:label="@string/glance_minimal">
             <intent-filter>

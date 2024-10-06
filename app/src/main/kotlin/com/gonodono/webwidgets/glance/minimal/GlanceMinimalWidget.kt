@@ -61,7 +61,6 @@ private class GlanceMinimalWidget : GlanceAppWidget() {
                         provider = ImageProvider(state.bitmap),
                         contentDescription = "WebShot"
                     )
-
                     State.Timeout -> TimeoutMessage()
                     State.Error -> ErrorMessage()
                 }

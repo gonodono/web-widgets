@@ -1,4 +1,4 @@
-package com.gonodono.webwidgets.view.minimal
+package com.gonodono.webwidgets.remoteviews.minimal
 
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
@@ -12,18 +12,19 @@ import com.gonodono.webwidgets.WIKIPEDIA_RANDOM_URL
 import com.gonodono.webwidgets.addToWindowManager
 import com.gonodono.webwidgets.awaitLayout
 import com.gonodono.webwidgets.awaitLoadUrl
+import com.gonodono.webwidgets.remoteviews.RECEIVER_TIMEOUT
+import com.gonodono.webwidgets.remoteviews.busyViews
+import com.gonodono.webwidgets.remoteviews.doAsync
+import com.gonodono.webwidgets.remoteviews.show
+import com.gonodono.webwidgets.remoteviews.updateAppWidgets
 import com.gonodono.webwidgets.removeFromWindowManager
 import com.gonodono.webwidgets.screenSize
-import com.gonodono.webwidgets.view.RECEIVER_TIMEOUT
-import com.gonodono.webwidgets.view.busyViews
-import com.gonodono.webwidgets.view.doAsync
-import com.gonodono.webwidgets.view.show
-import com.gonodono.webwidgets.view.updateAppWidgets
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-class ViewMinimalWidgetProvider : AppWidgetProvider() {
+class RemoteViewsMinimalWidget : AppWidgetProvider() {
 
     override fun onUpdate(
         context: Context,
@@ -43,8 +44,8 @@ class ViewMinimalWidgetProvider : AppWidgetProvider() {
         val views = RemoteViews(context.packageName, R.layout.widget_simple)
         withTimeoutOrNull(RECEIVER_TIMEOUT) {
             val frameLayout = FrameLayout(context)
-            when {
-                frameLayout.addToWindowManager() -> try {
+            if (frameLayout.addToWindowManager()) {
+                try {
                     val webView = withContext(Dispatchers.Main) {
                         WebView(context).also { frameLayout.addView(it) }
                     }
@@ -55,10 +56,12 @@ class ViewMinimalWidgetProvider : AppWidgetProvider() {
                     views.setImageViewBitmap(R.id.image, bitmap)
                     views.show(R.id.image)
                 } finally {
-                    frameLayout.removeFromWindowManager()
+                    withContext(NonCancellable) {
+                        frameLayout.removeFromWindowManager()
+                    }
                 }
-
-                else -> views.show(R.id.error)
+            } else {
+                views.show(R.id.error)
             }
         } ?: views.show(R.id.timeout)
 

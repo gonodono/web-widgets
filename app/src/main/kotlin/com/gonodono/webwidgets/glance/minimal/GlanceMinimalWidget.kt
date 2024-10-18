@@ -33,6 +33,7 @@ import com.gonodono.webwidgets.glance.TimeoutMessage
 import com.gonodono.webwidgets.removeFromWindowManager
 import com.gonodono.webwidgets.screenSize
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -72,8 +73,8 @@ private class GlanceMinimalWidget : GlanceAppWidget() {
     private suspend fun update(context: Context) {
         widgetState = withTimeoutOrNull(GLANCE_TIMEOUT) {
             val frameLayout = FrameLayout(context)
-            when {
-                frameLayout.addToWindowManager() -> try {
+            if (frameLayout.addToWindowManager()) {
+                try {
                     val webView = withContext(Dispatchers.Main) {
                         WebView(context).also { frameLayout.addView(it) }
                     }
@@ -83,10 +84,12 @@ private class GlanceMinimalWidget : GlanceAppWidget() {
                     val bitmap = webView.drawToBitmap()
                     State.Complete(bitmap)
                 } finally {
-                    frameLayout.removeFromWindowManager()
+                    withContext(NonCancellable) {
+                        frameLayout.removeFromWindowManager()
+                    }
                 }
-
-                else -> State.Error
+            } else {
+                State.Error
             }
         } ?: State.Timeout
     }

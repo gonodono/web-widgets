@@ -1,4 +1,4 @@
-package com.gonodono.webwidgets.view.scroll
+package com.gonodono.webwidgets.remoteviews.scroll
 
 import android.content.Context
 import android.content.Intent
@@ -13,15 +13,15 @@ import com.gonodono.webwidgets.R
 import com.gonodono.webwidgets.TAG
 import com.gonodono.webwidgets.WIKIPEDIA_RANDOM_URL
 import com.gonodono.webwidgets.WebShooter
-import com.gonodono.webwidgets.view.appWidgetIdExtra
-import com.gonodono.webwidgets.view.appWidgetManager
-import com.gonodono.webwidgets.view.getUrl
-import com.gonodono.webwidgets.view.setUrl
-import com.gonodono.webwidgets.view.widgetSize
+import com.gonodono.webwidgets.remoteviews.appWidgetIdExtra
+import com.gonodono.webwidgets.remoteviews.appWidgetManager
+import com.gonodono.webwidgets.remoteviews.getUrl
+import com.gonodono.webwidgets.remoteviews.setUrl
+import com.gonodono.webwidgets.remoteviews.widgetSize
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 
-private class ViewScrollWidgetFactory(
+private class RemoteViewsScrollFactory(
     private val context: Context,
     private val appWidgetId: Int
 ) : RemoteViewsService.RemoteViewsFactory {
@@ -33,7 +33,7 @@ private class ViewScrollWidgetFactory(
     private var currentSize = Size(0, 0)
 
     override fun onCreate() {
-        webShooter.initialize()
+        webShooter.initializeBlocking()
     }
 
     override fun onDataSetChanged() {
@@ -90,9 +90,10 @@ private class ViewScrollWidgetFactory(
     override fun onDestroy() {}
 }
 
-class ViewScrollWidgetService : RemoteViewsService() {
+class RemoteViewsScrollService : RemoteViewsService() {
+
     override fun onGetViewFactory(intent: Intent): RemoteViewsFactory =
-        ViewScrollWidgetFactory(applicationContext, intent.appWidgetIdExtra)
+        RemoteViewsScrollFactory(applicationContext, intent.appWidgetIdExtra)
 }
 
 private fun itemViews(

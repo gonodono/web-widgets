@@ -5,14 +5,10 @@ import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
@@ -34,18 +30,17 @@ class MainActivity : ComponentActivity() {
         setContent {
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.background)
+                verticalArrangement = Arrangement.spacedBy(
+                    space = 20.dp,
+                    alignment = Alignment.CenterVertically
+                ),
+                modifier = Modifier.fillMaxSize()
             ) {
                 Text("Web Widgets", fontSize = 28.sp)
-                Spacer(Modifier.size(10.dp))
                 if (hasPermission.value) {
                     Text("Permission granted")
                 } else {
                     Text("Overlay permission required")
-                    Spacer(Modifier.size(10.dp))
                     Button(::openPermissions) { Text("Open permissions") }
                 }
             }

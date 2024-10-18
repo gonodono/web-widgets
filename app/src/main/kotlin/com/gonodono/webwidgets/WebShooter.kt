@@ -7,6 +7,7 @@ import android.graphics.Point
 import android.os.Build
 import android.util.Log
 import android.util.Size
+import android.view.Choreographer
 import android.view.View
 import android.view.WindowManager
 import android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
@@ -52,10 +53,16 @@ internal class WebShooter(context: Context) {
     var canDraw: Boolean = false
         private set
 
-    fun initialize() = runBlocking(Dispatchers.Main.immediate) {
+    fun initializeBlocking() =
+        runBlocking(Dispatchers.Main.immediate) { initialize() }
+
+    suspend fun initialize() = withContext(Dispatchers.Main) {
         val frame = FrameLayout(context)
         if (frame.addToWindowManager() && frame.removeFromWindowManager()) {
-            webView = WebView(context).also { frame.addView(it) }
+            webView = WebView(context).also { view ->
+                view.isVerticalScrollBarEnabled = false
+                frame.addView(view)
+            }
             frameLayout = frame
             canDraw = true
         }
@@ -92,6 +99,8 @@ internal class WebShooter(context: Context) {
                 )
                 coroutineContext.ensureActive()
                 if (imageSpecs.height <= 0) return Error("Layout error")
+
+                awaitDisplayFrames(10)
 
                 val bitmap = web.drawToBitmap(
                     imageSpecs.width,
@@ -213,6 +222,22 @@ internal suspend fun WebView.awaitLayout(width: Int, height: Int) =
                 }
             )
             layout(0, 0, width, height)
+        }
+    }
+
+internal suspend fun awaitDisplayFrames(frameCount: Int) =
+    withContext(Dispatchers.Main) {
+        val choreographer = Choreographer.getInstance()
+        repeat(frameCount) {
+            suspendCancellableCoroutine { continuation ->
+                val callback = Choreographer.FrameCallback {
+                    if (continuation.isActive) continuation.resume(Unit)
+                }
+                continuation.invokeOnCancellation {
+                    choreographer.removeFrameCallback(callback)
+                }
+                choreographer.postFrameCallback(callback)
+            }
         }
     }
 

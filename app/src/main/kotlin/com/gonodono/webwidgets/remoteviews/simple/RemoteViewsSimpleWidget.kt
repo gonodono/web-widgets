@@ -1,4 +1,4 @@
-package com.gonodono.webwidgets.view.simple
+package com.gonodono.webwidgets.remoteviews.simple
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager
@@ -17,23 +17,23 @@ import com.gonodono.webwidgets.TAG
 import com.gonodono.webwidgets.WIKIPEDIA_RANDOM_URL
 import com.gonodono.webwidgets.WebShooter
 import com.gonodono.webwidgets.handleActionOpen
-import com.gonodono.webwidgets.view.ACTION_RELOAD
-import com.gonodono.webwidgets.view.RECEIVER_TIMEOUT
-import com.gonodono.webwidgets.view.appWidgetIdExtra
-import com.gonodono.webwidgets.view.appWidgetManager
-import com.gonodono.webwidgets.view.busyViews
-import com.gonodono.webwidgets.view.doAsync
-import com.gonodono.webwidgets.view.getUrl
-import com.gonodono.webwidgets.view.setUrl
-import com.gonodono.webwidgets.view.show
-import com.gonodono.webwidgets.view.updateAppWidgets
-import com.gonodono.webwidgets.view.urlKey
-import com.gonodono.webwidgets.view.widgetSize
-import com.gonodono.webwidgets.view.widgetStates
+import com.gonodono.webwidgets.remoteviews.ACTION_RELOAD
+import com.gonodono.webwidgets.remoteviews.RECEIVER_TIMEOUT
+import com.gonodono.webwidgets.remoteviews.appWidgetIdExtra
+import com.gonodono.webwidgets.remoteviews.appWidgetManager
+import com.gonodono.webwidgets.remoteviews.busyViews
+import com.gonodono.webwidgets.remoteviews.doAsync
+import com.gonodono.webwidgets.remoteviews.getUrl
+import com.gonodono.webwidgets.remoteviews.setUrl
+import com.gonodono.webwidgets.remoteviews.show
+import com.gonodono.webwidgets.remoteviews.updateAppWidgets
+import com.gonodono.webwidgets.remoteviews.urlKey
+import com.gonodono.webwidgets.remoteviews.widgetSize
+import com.gonodono.webwidgets.remoteviews.widgetStates
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withTimeoutOrNull
 
-class ViewSimpleWidgetProvider : AppWidgetProvider() {
+class RemoteViewsSimpleWidget : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
@@ -80,9 +80,10 @@ class ViewSimpleWidgetProvider : AppWidgetProvider() {
     ) {
         doAsync {
             val webShooter = WebShooter(context).apply { initialize() }
-            val initial = when {
-                webShooter.canDraw -> busyViews(context)
-                else -> errorViews(context)
+            val initial = if (webShooter.canDraw) {
+                busyViews(context)
+            } else {
+                errorViews(context)
             }
             appWidgetManager.updateAppWidgets(appWidgetIds, initial)
 
@@ -135,7 +136,7 @@ private suspend fun contentViews(
                 ACTION_OPEN,
                 result.url.toUri(),
                 context,
-                ViewSimpleWidgetProvider::class.java
+                RemoteViewsSimpleWidget::class.java
             )
             open.appWidgetIdExtra = appWidgetId
             views.setOnClickPendingIntent(
@@ -167,7 +168,7 @@ private fun simpleWidgetViews(context: Context, appWidgetId: Int): RemoteViews =
             ACTION_RELOAD,
             null,
             context,
-            ViewSimpleWidgetProvider::class.java
+            RemoteViewsSimpleWidget::class.java
         )
         reload.appWidgetIdExtra = appWidgetId
         setOnClickPendingIntent(

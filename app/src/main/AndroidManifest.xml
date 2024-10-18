@@ -10,12 +10,11 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.WebWidgets">
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity
             android:name=".MainActivity"
-            android:exported="true"
-            android:theme="@style/Theme.WebWidgets">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -26,9 +25,9 @@
         <!-- RemoteViews -->
 
         <receiver
-            android:name=".view.minimal.ViewMinimalWidgetProvider"
+            android:name=".remoteviews.minimal.RemoteViewsMinimalWidget"
             android:exported="true"
-            android:label="@string/view_minimal">
+            android:label="@string/remoteviews_minimal">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -39,10 +38,9 @@
         </receiver>
 
         <receiver
-            android:name=".view.simple.ViewSimpleWidgetProvider"
-            android:enabled="true"
+            android:name=".remoteviews.simple.RemoteViewsSimpleWidget"
             android:exported="true"
-            android:label="@string/view_simple">
+            android:label="@string/remoteviews_simple">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -53,10 +51,9 @@
         </receiver>
 
         <receiver
-            android:name=".view.scroll.ViewScrollWidgetProvider"
-            android:enabled="true"
+            android:name=".remoteviews.scroll.RemoteViewsScrollWidget"
             android:exported="true"
-            android:label="@string/view_scroll">
+            android:label="@string/remoteviews_scroll">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -67,7 +64,7 @@
         </receiver>
 
         <service
-            android:name=".view.scroll.ViewScrollWidgetService"
+            android:name=".remoteviews.scroll.RemoteViewsScrollService"
             android:permission="android.permission.BIND_REMOTEVIEWS" />
 
 
@@ -88,7 +85,6 @@
 
         <receiver
             android:name=".glance.simple.GlanceSimpleWidgetReceiver"
-            android:enabled="true"
             android:exported="true"
             android:label="@string/glance_simple">
             <intent-filter>
@@ -102,7 +98,6 @@
 
         <receiver
             android:name=".glance.scroll.GlanceScrollWidgetReceiver"
-            android:enabled="true"
             android:exported="true"
             android:label="@string/glance_scroll">
             <intent-filter>

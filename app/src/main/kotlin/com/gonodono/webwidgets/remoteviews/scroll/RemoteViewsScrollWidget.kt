@@ -1,4 +1,4 @@
-package com.gonodono.webwidgets.view.scroll
+package com.gonodono.webwidgets.remoteviews.scroll
 
 import android.app.PendingIntent
 import android.app.PendingIntent.FLAG_IMMUTABLE
@@ -14,15 +14,15 @@ import androidx.core.net.toUri
 import com.gonodono.webwidgets.ACTION_OPEN
 import com.gonodono.webwidgets.R
 import com.gonodono.webwidgets.handleActionOpen
-import com.gonodono.webwidgets.view.ACTION_RELOAD
-import com.gonodono.webwidgets.view.appWidgetIdExtra
-import com.gonodono.webwidgets.view.appWidgetManager
-import com.gonodono.webwidgets.view.doAsync
-import com.gonodono.webwidgets.view.setUrl
-import com.gonodono.webwidgets.view.urlKey
-import com.gonodono.webwidgets.view.widgetStates
+import com.gonodono.webwidgets.remoteviews.ACTION_RELOAD
+import com.gonodono.webwidgets.remoteviews.appWidgetIdExtra
+import com.gonodono.webwidgets.remoteviews.appWidgetManager
+import com.gonodono.webwidgets.remoteviews.doAsync
+import com.gonodono.webwidgets.remoteviews.setUrl
+import com.gonodono.webwidgets.remoteviews.urlKey
+import com.gonodono.webwidgets.remoteviews.widgetStates
 
-class ViewScrollWidgetProvider : AppWidgetProvider() {
+class RemoteViewsScrollWidget : AppWidgetProvider() {
 
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
@@ -65,6 +65,7 @@ class ViewScrollWidgetProvider : AppWidgetProvider() {
 }
 
 internal fun AppWidgetManager.notifyListChanged(appWidgetId: Int) {
+    @Suppress("DEPRECATION")
     notifyAppWidgetViewDataChanged(appWidgetId, R.id.list)
 }
 
@@ -74,16 +75,17 @@ private fun updateWidget(
     appWidgetId: Int
 ) {
     val views = RemoteViews(context.packageName, R.layout.widget_scroll_main)
-    val adapter = Intent(context, ViewScrollWidgetService::class.java)
+    val adapter = Intent(context, RemoteViewsScrollService::class.java)
     adapter.appWidgetIdExtra = appWidgetId // <- Must do before toUri().
     adapter.setData(adapter.toUri(Intent.URI_INTENT_SCHEME).toUri())
+    @Suppress("DEPRECATION")
     views.setRemoteAdapter(R.id.list, adapter)
     views.setEmptyView(R.id.list, R.id.progress)
     val open = Intent(
         ACTION_OPEN,
         null,
         context,
-        ViewScrollWidgetProvider::class.java
+        RemoteViewsScrollWidget::class.java
     )
     views.setPendingIntentTemplate(
         R.id.list,
@@ -98,7 +100,7 @@ private fun updateWidget(
         ACTION_RELOAD,
         null,
         context,
-        ViewScrollWidgetProvider::class.java
+        RemoteViewsScrollWidget::class.java
     )
     reload.appWidgetIdExtra = appWidgetId
     views.setOnClickPendingIntent(

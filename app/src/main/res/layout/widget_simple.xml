@@ -6,7 +6,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/white"
-    tools:ignore="HardcodedText">
+    tools:ignore="HardcodedText,Overdraw">
 
     <TextView
         android:id="@+id/timeout"
@@ -35,11 +35,11 @@
 
     <ImageButton
         android:id="@+id/reload"
-        android:src="@drawable/reload"
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_gravity="bottom|end"
         android:contentDescription="Reload"
+        android:src="@drawable/reload"
         android:visibility="gone" />
 
 </FrameLayout>

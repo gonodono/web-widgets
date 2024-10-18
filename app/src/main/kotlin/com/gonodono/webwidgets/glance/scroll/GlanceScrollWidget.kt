@@ -1,6 +1,5 @@
 package com.gonodono.webwidgets.glance.scroll
 
-import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -28,16 +27,13 @@ private class GlanceScrollWidget : BaseGlanceWidget() {
     override val imageHeightFitsWidget: Boolean = false
 
     @Composable
-    override fun Content(context: Context, webShot: WebShooter.WebShot) {
+    override fun Content(webShot: WebShooter.WebShot) {
         LazyColumn {
             item {
-                when {
-                    webShot.overflows -> OverflowImage(
-                        context = context,
-                        webShot = webShot
-                    )
-                    else -> WebLinkImage(
-                        context = context,
+                if (webShot.overflows) {
+                    OverflowImage(webShot = webShot)
+                } else {
+                    WebLinkImage(
                         webShot = webShot,
                         receiver = GlanceScrollWidgetReceiver::class.java
                     )
@@ -48,13 +44,9 @@ private class GlanceScrollWidget : BaseGlanceWidget() {
 }
 
 @Composable
-private fun OverflowImage(
-    context: Context,
-    webShot: WebShooter.WebShot
-) {
+private fun OverflowImage(webShot: WebShooter.WebShot) {
     Box(contentAlignment = Alignment.BottomCenter) {
         WebLinkImage(
-            context = context,
             webShot = webShot,
             receiver = GlanceScrollWidgetReceiver::class.java
         )

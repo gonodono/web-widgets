@@ -3,6 +3,7 @@ package com.gonodono.webwidgets.glance
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -18,6 +19,7 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.Image
 import androidx.glance.ImageProvider
+import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.CircularProgressIndicator
@@ -55,10 +57,7 @@ internal abstract class BaseGlanceWidget : GlanceAppWidget() {
     protected abstract val imageHeightFitsWidget: Boolean
 
     @Composable
-    protected abstract fun Content(
-        context: Context,
-        webShot: WebShooter.WebShot
-    )
+    protected abstract fun Content(webShot: WebShooter.WebShot)
 
     private sealed interface State {
         data object Loading : State
@@ -71,19 +70,41 @@ internal abstract class BaseGlanceWidget : GlanceAppWidget() {
 
     private var widgetState by mutableStateOf<State>(State.Loading)
 
+    private lateinit var webShooter: WebShooter
+
     private var url: String? = null
 
     override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val webShooter = WebShooter(context).apply { initialize() }
-        provideContent { MainContent(context, webShooter) }
+        if (!::webShooter.isInitialized) {
+            webShooter = WebShooter(context).apply { initialize() }
+        }
+
+        // The demo assumes that the host is a basic launcher that handles only
+        // portrait and landscape configurations. provideGlance() is called for
+        // each size for every update, and the results are combined into one
+        // RemoteViews. If we were to provide full size scroll images for both
+        // orientations, they could exceed the maximum limit for an update, so
+        // the demo provides actual content for only the current orientation.
+        val orientation = context.resources.configuration.orientation
+        val isDevicePortrait = orientation == Configuration.ORIENTATION_PORTRAIT
+        provideContent {
+            val isWidgetPortrait = LocalSize.current.run { width < height }
+            if (isWidgetPortrait == isDevicePortrait) {
+                MainContent()
+            } else {
+                CircularProgressIndicator()
+            }
+        }
     }
 
     @Composable
-    private fun MainContent(context: Context, webShooter: WebShooter) {
+    private fun MainContent() {
+        val context = LocalContext.current
         val size = with(Density(context)) { LocalSize.current.toSize() }
             .run { AndroidSize(width.toInt(), height.toInt()) }
+
         Box(
             contentAlignment = when (widgetState) {
                 State.Loading -> Alignment.Center
@@ -97,19 +118,19 @@ internal abstract class BaseGlanceWidget : GlanceAppWidget() {
             val state = widgetState
             when (state) {
                 State.Loading -> CircularProgressIndicator()
-                is State.Complete -> Content(context, state.webShot)
+                is State.Complete -> Content(state.webShot)
                 State.Timeout -> TimeoutMessage()
-                State.Error -> ErrorMessage()
+                else -> ErrorMessage()
             }
             if (state !is State.Loading && webShooter.canDraw) {
-                ReloadButton { url = null; update(webShooter, size) }
+                ReloadButton { url = null; update(size) }
             }
         }
 
-        LaunchedEffect(size) { update(webShooter, size) }
+        LaunchedEffect(Unit) { update(size) }
     }
 
-    private fun update(webShooter: WebShooter, size: AndroidSize) {
+    private fun update(size: AndroidSize) {
         scope.launch {
             if (webShooter.canDraw) {
                 widgetState = State.Loading
@@ -156,10 +177,10 @@ internal const val GLANCE_TIMEOUT = 40_000L  // Max at ~45_000L
 
 @Composable
 internal fun WebLinkImage(
-    context: Context,
     webShot: WebShooter.WebShot,
     receiver: Class<out BroadcastReceiver>
 ) {
+    val context = LocalContext.current
     val intent = Intent(ACTION_OPEN, webShot.url.toUri(), context, receiver)
     Image(
         provider = ImageProvider(webShot.bitmap),

@@ -1,6 +1,6 @@
 # Web Widgets
 
-Basic examples of putting rendered `WebView` content into App Widget images
+A demonstration of drawing rendered `WebView` content into App Widget images
 along with various features, for both `RemoteViews` and Glance.
 
 <p align="center">
@@ -11,7 +11,9 @@ width="30%" />
 
 This project contains complete working examples to supplement those outlined in
 [this Stack Overflow post][so-post]. There might be relevant information or
-details there that I may have overlooked here, and vice versa.
+details there that I've overlooked here, and vice versa.
+
+<br />
 
 ## Contents
 
@@ -19,6 +21,8 @@ details there that I may have overlooked here, and vice versa.
 - [RemoteViews](#remoteviews)
 - [Glance](#glance)
 - [Notes](#notes)
+
+<br />
 
 ## Overview
 
@@ -35,7 +39,7 @@ details there that I may have overlooked here, and vice versa.
     limit, and is then displayed as the only item in a `ListView` or
     `LazyColumn`.
 
-- All of the examples use the same overall method to generate their images: a
+- All of the Widgets use the same overall method to generate their images: a
   `WebView` is instantiated and, in order to enable rendering, attached to
   `WindowManager` inside a zero-by-zero `FrameLayout`. A page is then loaded,
   laid out, and drawn to a `Bitmap` that's displayed in the Widget, after which
@@ -43,32 +47,25 @@ details there that I may have overlooked here, and vice versa.
   into a single helper class named [`WebShooter`][web-shooter].
 
 - Neither framework's examples really do much as far as data persistence goes.
-  The Glance versions manage to use only runtime variables, because
-  `GlanceAppWidget`s hang around until the process is killed. The `RemoteViews`
-  versions do save state to disk, but only because `AppWidgetProvider` instances
-  are short-lived, and a new one is created for each Widget action.
+  The `RemoteViews` versions do save state to disk, but only because
+  `AppWidgetProvider` instances are short-lived, and a new one is created for
+  each Widget action. The Glance versions manage to use only runtime variables,
+  because `GlanceAppWidget`s hang around until the process is killed.
 
 - All of the examples assume that the page will load relatively quickly. Each
   one uses only the time available to it from its own component; i.e., there are
   no separate `Worker`s or loader `Service`s. Consult the corresponding sections
-  below for the individual examples' respective time limits. In production, I'd
-  suggest using `Worker`s everywhere. [This official Glance sample][sample] has
-  an `ImageWorker` that's very close to what would be needed here.
+  below for the individual Widgets' respective time limits. In production, I'd
+  suggest using `Worker`s for most setups. [This official Glance sample][sample]
+  has an `ImageWorker` that's very close to what would be needed here.
 
-- All of the examples use Wikipedia for their pages. I am not affiliated with
-  The Wikimedia Foundation nor any of its sites or organizations. It is simply a
-  reliable, lightweight site with a random page functionality. The reproductions
-  of small sections of various Wikipedia articles used in this document's
-  graphics are believed to constitute fair use.
+<br />
 
 ## RemoteViews
 
-To keep things short and clear, the identifiers for packages and classes in this
-framework use `View` instead of `RemoteViews`; e.g., `ViewSimpleWidgetProvider`.
-
 ### Minimal
 
-<sup>[`ViewMinimalWidgetProvider`][view-minimal]</sup>
+<sup>[`RemoteViewsMinimalWidget`][remoteviews-minimal]</sup>
 
 The Minimal version simply displays a static image or a failure message after
 showing an indeterminate indicator while busy. The actual image is the same
@@ -82,7 +79,7 @@ the page load, layout, and draw. It takes advantage of `BroadcastReceiver`'s
 
 ### Simple
 
-<sup>[`ViewSimpleWidgetProvider`][view-simple]</sup>
+<sup>[`RemoteViewsSimpleWidget`][remoteviews-simple]</sup>
 
 The Simple one adds a reload button to force a new random page, and the image
 itself can be clicked to open the currently displayed page in a (separate)
@@ -91,11 +88,11 @@ rather than the screen, to cut down on overhead.
 
 This one launches a coroutine from `onUpdate()` like the Minimal one, with the
 same ~10-second timeout, but its `WebView` operations and draw routine are all
-contained in the [`WebShooter`][web-shooter] class.
+contained in the `WebShooter` class.
 
 ### Scroll
 
-<sup>[`ViewScrollWidgetProvider`][view-scroll]</sup>
+<sup>[`RemoteViewsScrollWidget`][remoteviews-scroll]</sup>
 
 The Scroll version basically adds scrolling to the Simple one, though it's a bit
 more complicated than it sounds. The only scrolling containers allowed in
@@ -114,19 +111,21 @@ figures out it can't draw. This one is mainly demonstrating how to use the time
 available in the `Factory`, if that might be useful for your particular design,
 so I didn't go to too much trouble to ensure feature parity here.
 
+<br />
+
 ## Glance
 
 Each Glance Widget has the same behavior and features as the corresponding
-`RemoteViews` version, apart from the small UI difference for errors/timeouts
-in Scroll. They all have the same timeout of 40 seconds, to come in under the
+`RemoteViews` version, apart from the small UI difference for errors/timeouts in
+Scroll. They all have the same timeout of 40 seconds, to come in under the
 documentation's stated limit of "about 45 seconds" for `provideContent()`.
 
 ### Minimal
 
 <sup>[`GlanceMinimalWidget`][glance-minimal]</sup>
 
-The Minimal one again handles the load, layout, and draw internally, showing the
-same busy indicator and static results.
+The Minimal one again handles the load, layout, and draw directly, showing a
+similar busy indicator and static results.
 
 ### Simple
 
@@ -135,9 +134,8 @@ same busy indicator and static results.
 
 Thanks to Glance's abstractions, the Simple and Scroll versions are nearly
 identical. Both inherit from `BaseGlanceWidget`, which handles all of the
-[`WebShooter`][web-shooter] work. `GlanceSimpleWidget` just tells the base class
-that the image should fit the Widget's height, and then provides a static image
-`Composable`.
+`WebShooter` work. `GlanceSimpleWidget` just tells the base class that the image
+should fit the Widget's height, and then provides a static image `Composable`.
 
 ### Scroll
 
@@ -147,25 +145,41 @@ that the image should fit the Widget's height, and then provides a static image
 This one tells `BaseGlanceWidget` that the image height should be as tall as
 possible, and provides a `LazyColumn` with a single item for the image.
 
+<br />
+
 ## Notes
 
-The `WebView` in all of these examples uses default settings; i.e., no
-JavaScript, no web storage, etc. The given routine seems to work quite robustly
-with those defaults, at least on the emulators, all the way back to Nougat. I
-haven't done much testing with any other configurations, but it seems that
-enabling certain settings might cause `WebView` to need a few more frames before
-everything's drawable (not counting whatever might be required by any
-long-running scripts).
+- One of the trickiest parts of this is figuring out when the `WebView` is ready
+  to be drawn. Listening for the URL load to finish isn't enough, so a
+  `VisualStateCallback` must be used, but even that doesn't appear to be
+  sufficient a lot of the time.
 
-The [platform CTS helper class][helper] that was consulted for the
-`postVisualStateCallback()` setup adds a `ViewTreeObserver.OnDrawListener` upon
-the visual callback, and then invalidates to cause an extra frame before drawing
-in order to ensure it's ready. Something similar is possible with this solution,
-with a few adjustments, but it wasn't necessary for my basic examples.
+  The [platform CTS helper class][cts-helper] that was consulted for the
+  `postVisualStateCallback()` usage adds a `ViewTreeObserver.OnDrawListener`
+  upon the visual callback, and then invalidates to cause an extra frame before
+  drawing in order to ensure it's ready. Aside from the fact that the relevant
+  test renders are extremely simplistic, this technique won't work here anyway
+  because invalidation calls go up and down the hierarchy, and this one will
+  stop them at the `FrameLayout` with zero visible area.
 
-If you do find that your setup isn't fully prepared before the draw, it might be
-simpler to add a short `delay()` after the `awaitLayout()`, instead of trying to
-figure out an exact number of frames to wait for.
+  If you do find that your setup isn't fully prepared before the draw, it might
+  be simplest to add a short `delay()` after `WebShooter`'s `performLayouts()`
+  call. If you'd prefer something like the invalidation tack, we can use
+  `Choreographer` to get frame callbacks and suspend over as many as we like.
+  The demo shows this last method, with its `awaitDisplayFrames()` function.
+
+- There's apparently some issue with older emulator versions that causes most
+  pages to render blank, for some reason. I think it starts around Pie, going
+  back in the versions. There are various suggestions for solutions out there,
+  but I just use `news.google.com` instead when testing on those versions,
+  'cause it seems like Google sites work just fine, not counting the stuff
+  missing due to JavaScript being disabled.
+
+- All of the Widgets currently use Wikipedia for their pages. I am not
+  affiliated with The Wikimedia Foundation nor any of its sites or
+  organizations. It is simply a reliable, lightweight site with a random page
+  functionality. The reproductions of small sections of various Wikipedia
+  articles used in this document's graphics are believed to constitute fair use.
 
 <br />
 
@@ -199,11 +213,11 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
   [sample]: https://github.com/android/user-interface-samples/tree/main/AppWidget/app/src/main/java/com/example/android/appwidget/glance/image
 
-  [view-minimal]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/view/minimal/ViewMinimalWidgetProvider.kt
+  [remoteviews-minimal]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/remoteviews/minimal/RemoteViewsMinimalWidget.kt
 
-  [view-simple]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/view/simple/ViewSimpleWidgetProvider.kt
+  [remoteviews-simple]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/remoteviews/simple/RemoteViewsSimpleWidget.kt
 
-  [view-scroll]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/view/scroll/ViewScrollWidgetProvider.kt
+  [remoteviews-scroll]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/remoteviews/scroll/RemoteViewsScrollWidget.kt
 
   [glance-minimal]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/glance/minimal/GlanceMinimalWidget.kt
 
@@ -213,4 +227,4 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
   [glance-scroll]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/glance/scroll/GlanceScrollWidget.kt
 
-  [helper]: https://cs.android.com/android/platform/superproject/main/+/main:cts/tests/tests/uirendering/src/android/uirendering/cts/util/WebViewReadyHelper.java
+  [cts-helper]: https://cs.android.com/android/platform/superproject/main/+/main:cts/tests/tests/uirendering/src/android/uirendering/cts/util/WebViewReadyHelper.java

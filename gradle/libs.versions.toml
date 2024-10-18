@@ -1,10 +1,10 @@
 [versions]
-agp = "8.6.1"
-kotlin = "2.0.20"
+agp = "8.7.1"
+kotlin = "2.0.21"
 coreKtx = "1.13.1"
-compose = "2024.09.03"
-activityCompose = "1.9.2"
-glance = "1.1.0"
+compose = "2024.10.00"
+activityCompose = "1.9.3"
+glance = "1.1.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -19,4 +19,4 @@ androidx-glance = { group = "androidx.glance", name = "glance-appwidget", versio
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
-compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

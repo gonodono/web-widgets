@@ -1,4 +1,4 @@
-package com.gonodono.webwidgets.view
+package com.gonodono.webwidgets.remoteviews
 
 import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID
@@ -22,12 +22,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlin.coroutines.cancellation.CancellationException
 
 internal const val ACTION_RELOAD = "${BuildConfig.APPLICATION_ID}.action.RELOAD"
 
 internal const val RECEIVER_TIMEOUT = 9_500L  // ANR at 10_000L
-
 
 internal inline var Intent.appWidgetIdExtra: Int
     get() = getIntExtra(EXTRA_APPWIDGET_ID, INVALID_APPWIDGET_ID)
@@ -42,9 +40,10 @@ internal fun Context.widgetSize(appWidgetId: Int): Size {
     val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
     val density = resources.displayMetrics.density
     val isPortrait = resources.configuration.orientation == ORIENTATION_PORTRAIT
-    return when {
-        isPortrait -> portraitSize(options, density)
-        else -> landscapeSize(options, density)
+    return if (isPortrait) {
+        portraitSize(options, density)
+    } else {
+        landscapeSize(options, density)
     }
 }
 
@@ -60,7 +59,6 @@ private fun landscapeSize(bundle: Bundle, density: Float): Size {
     return Size((width * density).toInt(), (height * density).toInt())
 }
 
-
 internal fun busyViews(context: Context): RemoteViews =
     RemoteViews(context.packageName, R.layout.widget_busy)
 
@@ -72,7 +70,6 @@ internal fun AppWidgetManager.updateAppWidgets(
 ) {
     appWidgetIds.forEach { id -> updateAppWidget(id, views) }
 }
-
 
 internal inline val Context.widgetStates: SharedPreferences
     get() = getSharedPreferences("web_widget_states", Context.MODE_PRIVATE)
@@ -86,21 +83,20 @@ internal fun setUrl(context: Context, appWidgetId: Int, url: String?) {
 
 internal fun urlKey(appWidgetId: Int) = "url:$appWidgetId"
 
-
-internal fun BroadcastReceiver.doAsync(block: suspend () -> Unit) {
-    val scope = CoroutineScope(SupervisorJob())
-    val result = goAsync()
+internal fun BroadcastReceiver.doAsync(
+    scope: CoroutineScope = CoroutineScope(SupervisorJob()),
+    block: suspend () -> Unit
+) {
+    val pendingResult = goAsync()
     scope.launch {
         try {
             try {
                 block()
-            } catch (e: CancellationException) {
-                throw e
             } finally {
                 scope.cancel()
             }
         } finally {
-            result.finish()
+            pendingResult.finish()
         }
     }
 }

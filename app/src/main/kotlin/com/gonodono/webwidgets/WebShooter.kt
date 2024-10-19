@@ -100,7 +100,7 @@ internal class WebShooter(context: Context) {
                 coroutineContext.ensureActive()
                 if (imageSpecs.height <= 0) return Error("Layout error")
 
-                awaitDisplayFrames(10)
+                awaitDisplayFrames(10)  // Arbitrary count for the demo.
 
                 val bitmap = web.drawToBitmap(
                     imageSpecs.width,
@@ -177,9 +177,11 @@ internal suspend fun View.addToWindowManager(): Boolean =
 
 private val windowParams = WindowManager.LayoutParams(
     0, 0,
-    when {
-        Build.VERSION.SDK_INT >= 26 -> TYPE_APPLICATION_OVERLAY
-        else -> @Suppress("DEPRECATION") TYPE_SYSTEM_OVERLAY
+    if (Build.VERSION.SDK_INT >= 26) {
+        TYPE_APPLICATION_OVERLAY
+    } else {
+        @Suppress("DEPRECATION")
+        TYPE_SYSTEM_OVERLAY
     },
     FLAG_NOT_FOCUSABLE or FLAG_NOT_TOUCHABLE,
     PixelFormat.OPAQUE
@@ -225,30 +227,39 @@ internal suspend fun WebView.awaitLayout(width: Int, height: Int) =
         }
     }
 
-internal suspend fun awaitDisplayFrames(frameCount: Int) =
+// Waits at least frameCount, possibly up to frameCount + 1.
+internal suspend fun awaitDisplayFrames(frameCount: Int) {
+    check(frameCount > 0) { "frameCount must be positive" }
+
     withContext(Dispatchers.Main) {
+        var count = frameCount
         val choreographer = Choreographer.getInstance()
-        repeat(frameCount) {
-            suspendCancellableCoroutine { continuation ->
-                val callback = Choreographer.FrameCallback {
-                    if (continuation.isActive) continuation.resume(Unit)
+        suspendCancellableCoroutine { continuation ->
+            val callback = object : Choreographer.FrameCallback {
+                override fun doFrame(it: Long) {
+                    if (count-- > 0) {
+                        choreographer.postFrameCallback(this)
+                    } else {
+                        if (continuation.isActive) continuation.resume(Unit)
+                    }
                 }
-                continuation.invokeOnCancellation {
-                    choreographer.removeFrameCallback(callback)
-                }
-                choreographer.postFrameCallback(callback)
             }
+            continuation.invokeOnCancellation {
+                choreographer.removeFrameCallback(callback)
+                ensureActive()
+            }
+            choreographer.postFrameCallback(callback)
         }
     }
+}
 
-internal suspend fun WebView.drawToBitmap(
+private suspend fun WebView.drawToBitmap(
     width: Int,
     height: Int,
-    downScale: Float
+    scale: Float
 ): Bitmap = withContext(Dispatchers.Default) {
-    Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).applyCanvas {
-        withScale(downScale, downScale) { this@drawToBitmap.draw(this) }
-    }
+    Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        .applyCanvas { withScale(scale, scale) { draw(this) } }
 }
 
 internal fun Context.screenSize(): Size =

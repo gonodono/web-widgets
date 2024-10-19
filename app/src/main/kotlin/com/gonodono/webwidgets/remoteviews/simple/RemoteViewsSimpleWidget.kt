@@ -25,8 +25,8 @@ import com.gonodono.webwidgets.remoteviews.busyViews
 import com.gonodono.webwidgets.remoteviews.doAsync
 import com.gonodono.webwidgets.remoteviews.getUrl
 import com.gonodono.webwidgets.remoteviews.setUrl
-import com.gonodono.webwidgets.remoteviews.show
-import com.gonodono.webwidgets.remoteviews.updateAppWidgets
+import com.gonodono.webwidgets.remoteviews.showView
+import com.gonodono.webwidgets.remoteviews.updateWidgets
 import com.gonodono.webwidgets.remoteviews.urlKey
 import com.gonodono.webwidgets.remoteviews.widgetSize
 import com.gonodono.webwidgets.remoteviews.widgetStates
@@ -85,27 +85,28 @@ class RemoteViewsSimpleWidget : AppWidgetProvider() {
             } else {
                 errorViews(context)
             }
-            appWidgetManager.updateAppWidgets(appWidgetIds, initial)
+            appWidgetManager.updateWidgets(appWidgetIds, initial)
 
-            if (webShooter.canDraw) {
-                val views = arrayOfNulls<RemoteViews>(appWidgetIds.size)
-                withTimeoutOrNull(RECEIVER_TIMEOUT) {
-                    appWidgetIds.forEachIndexed { index, id ->
-                        if (!isActive) return@withTimeoutOrNull
-                        val size = context.widgetSize(id)
-                        views[index] = if (size.width > 0 && size.height > 0) {
-                            contentViews(context, webShooter, id, size)
-                        } else {
-                            initial  // Leave busy.
-                        }
+            if (!webShooter.canDraw) return@doAsync
+
+            val views = arrayOfNulls<RemoteViews>(appWidgetIds.size)
+            withTimeoutOrNull(RECEIVER_TIMEOUT) {
+                appWidgetIds.forEachIndexed { index, id ->
+                    if (!isActive) return@withTimeoutOrNull
+
+                    val size = context.widgetSize(id)
+                    views[index] = if (size.width > 0 && size.height > 0) {
+                        contentViews(context, webShooter, id, size)
+                    } else {
+                        initial  // Leave busy.
                     }
                 }
-                appWidgetIds.forEachIndexed { index, id ->
-                    appWidgetManager.updateAppWidget(
-                        id,
-                        views[index] ?: timeoutViews(context, id)
-                    )
-                }
+            }
+            appWidgetIds.forEachIndexed { index, id ->
+                appWidgetManager.updateAppWidget(
+                    id,
+                    views[index] ?: timeoutViews(context, id)
+                )
             }
         }
     }
@@ -148,19 +149,19 @@ private suspend fun contentViews(
                     PendingIntent.FLAG_IMMUTABLE
                 )
             )
-            views.show(R.id.image)
+            views.showView(R.id.image)
         }
 
         is WebShooter.Error -> {
             if (BuildConfig.DEBUG) Log.e(TAG, result.message)
-            views.show(R.id.error)
+            views.showView(R.id.error)
         }
     }
     return views
 }
 
 private fun timeoutViews(context: Context, appWidgetId: Int): RemoteViews =
-    simpleWidgetViews(context, appWidgetId).apply { show(R.id.timeout) }
+    simpleWidgetViews(context, appWidgetId).apply { showView(R.id.timeout) }
 
 private fun simpleWidgetViews(context: Context, appWidgetId: Int): RemoteViews =
     RemoteViews(context.packageName, R.layout.widget_simple).apply {
@@ -180,7 +181,7 @@ private fun simpleWidgetViews(context: Context, appWidgetId: Int): RemoteViews =
                 PendingIntent.FLAG_IMMUTABLE
             )
         )
-        show(R.id.reload)
+        showView(R.id.reload)
     }
 
 private fun errorViews(context: Context): RemoteViews =

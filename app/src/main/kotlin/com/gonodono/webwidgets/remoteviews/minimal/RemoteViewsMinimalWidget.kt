@@ -15,8 +15,8 @@ import com.gonodono.webwidgets.awaitLoadUrl
 import com.gonodono.webwidgets.remoteviews.RECEIVER_TIMEOUT
 import com.gonodono.webwidgets.remoteviews.busyViews
 import com.gonodono.webwidgets.remoteviews.doAsync
-import com.gonodono.webwidgets.remoteviews.show
-import com.gonodono.webwidgets.remoteviews.updateAppWidgets
+import com.gonodono.webwidgets.remoteviews.showView
+import com.gonodono.webwidgets.remoteviews.updateWidgets
 import com.gonodono.webwidgets.removeFromWindowManager
 import com.gonodono.webwidgets.screenSize
 import kotlinx.coroutines.Dispatchers
@@ -39,7 +39,7 @@ class RemoteViewsMinimalWidget : AppWidgetProvider() {
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
     ) {
-        appWidgetManager.updateAppWidgets(appWidgetIds, busyViews(context))
+        appWidgetManager.updateWidgets(appWidgetIds, busyViews(context))
 
         val views = RemoteViews(context.packageName, R.layout.widget_simple)
         withTimeoutOrNull(RECEIVER_TIMEOUT) {
@@ -54,17 +54,17 @@ class RemoteViewsMinimalWidget : AppWidgetProvider() {
                     webView.awaitLayout(size.width, size.height / 2)
                     val bitmap = webView.drawToBitmap()
                     views.setImageViewBitmap(R.id.image, bitmap)
-                    views.show(R.id.image)
+                    views.showView(R.id.image)
                 } finally {
                     withContext(NonCancellable) {
                         frameLayout.removeFromWindowManager()
                     }
                 }
             } else {
-                views.show(R.id.error)
+                views.showView(R.id.error)
             }
-        } ?: views.show(R.id.timeout)
+        } ?: views.showView(R.id.timeout)
 
-        appWidgetManager.updateAppWidgets(appWidgetIds, views)
+        appWidgetManager.updateWidgets(appWidgetIds, views)
     }
 }

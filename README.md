@@ -142,8 +142,8 @@ should fit the Widget's height, and then provides a static image `Composable`.
 <sup>[`BaseGlanceWidget`][glance-base],
 [`GlanceScrollWidget`][glance-scroll]</sup>
 
-This one tells `BaseGlanceWidget` that the image height should be as tall as
-possible, and provides a `LazyColumn` with a single item for the image.
+This one tells `BaseGlanceWidget` that the image height should be (almost) as
+tall as possible, and provides a `LazyColumn` with a single item for the image.
 
 <br />
 
@@ -158,22 +158,23 @@ possible, and provides a `LazyColumn` with a single item for the image.
   `postVisualStateCallback()` usage adds a `ViewTreeObserver.OnDrawListener`
   upon the visual callback, and then invalidates to cause an extra frame before
   drawing in order to ensure it's ready. Aside from the fact that the relevant
-  test renders are extremely simplistic, this technique won't work here anyway
-  because invalidation calls go up and down the hierarchy, and this one will
-  stop them at the `FrameLayout` with zero visible area.
+  platform test renders are extremely simplistic, that technique won't work here
+  anyway because invalidation calls go up and down the hierarchy, and this setup
+  will abort them at the `FrameLayout` because it has zero visible area.
 
-  If you do find that your setup isn't fully prepared before the draw, it might
+  If you do find that your page isn't fully prepared before the draw, it might
   be simplest to add a short `delay()` after `WebShooter`'s `performLayouts()`
-  call. If you'd prefer something like the invalidation tack, we can use
+  call. If you'd prefer something like the invalidation approach, we can use
   `Choreographer` to get frame callbacks and suspend over as many as we like.
-  The demo shows this last method, with its `awaitDisplayFrames()` function.
+  The demo illustrates this last method with its
+  [`awaitDisplayFrames()`][awaitDisplayFrames] function.
 
-- There's apparently some issue with older emulator versions that causes most
-  pages to render blank, for some reason. I think it starts around Pie, going
-  back in the versions. There are various suggestions for solutions out there,
-  but I just use `news.google.com` instead when testing on those versions,
-  'cause it seems like Google sites work just fine, not counting the stuff
-  missing due to JavaScript being disabled.
+- There's apparently some issue with older emulators that can cause most pages
+  to render blank, for some reason. I think it starts around Pie, going back in
+  the versions. There are various suggestions for solutions out there, but I
+  simply used `news.google.com` instead when testing on those because Google
+  sites seem to work just fine, not counting the stuff missing due to JavaScript
+  being disabled.
 
 - All of the Widgets currently use Wikipedia for their pages. I am not
   affiliated with The Wikimedia Foundation nor any of its sites or
@@ -228,3 +229,5 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
   [glance-scroll]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/glance/scroll/GlanceScrollWidget.kt
 
   [cts-helper]: https://cs.android.com/android/platform/superproject/main/+/main:cts/tests/tests/uirendering/src/android/uirendering/cts/util/WebViewReadyHelper.java
+
+  [awaitDisplayFrames]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/WebShooter.kt#L231

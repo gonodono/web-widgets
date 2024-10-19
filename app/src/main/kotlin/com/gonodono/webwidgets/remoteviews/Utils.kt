@@ -39,8 +39,7 @@ internal inline val Context.appWidgetManager: AppWidgetManager
 internal fun Context.widgetSize(appWidgetId: Int): Size {
     val options = appWidgetManager.getAppWidgetOptions(appWidgetId)
     val density = resources.displayMetrics.density
-    val isPortrait = resources.configuration.orientation == ORIENTATION_PORTRAIT
-    return if (isPortrait) {
+    return if (resources.configuration.orientation == ORIENTATION_PORTRAIT) {
         portraitSize(options, density)
     } else {
         landscapeSize(options, density)
@@ -62,9 +61,9 @@ private fun landscapeSize(bundle: Bundle, density: Float): Size {
 internal fun busyViews(context: Context): RemoteViews =
     RemoteViews(context.packageName, R.layout.widget_busy)
 
-internal fun RemoteViews.show(id: Int) = setViewVisibility(id, View.VISIBLE)
+internal fun RemoteViews.showView(id: Int) = setViewVisibility(id, View.VISIBLE)
 
-internal fun AppWidgetManager.updateAppWidgets(
+internal fun AppWidgetManager.updateWidgets(
     appWidgetIds: IntArray,
     views: RemoteViews
 ) {

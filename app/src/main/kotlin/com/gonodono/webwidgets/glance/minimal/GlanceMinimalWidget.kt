@@ -18,6 +18,7 @@ import androidx.glance.appwidget.CircularProgressIndicator
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
+import androidx.glance.appwidget.appWidgetBackground
 import androidx.glance.appwidget.provideContent
 import androidx.glance.background
 import androidx.glance.layout.Alignment
@@ -54,7 +55,10 @@ private class GlanceMinimalWidget : GlanceAppWidget() {
         provideContent {
             Box(
                 contentAlignment = Alignment.Center,
-                modifier = GlanceModifier.fillMaxSize().background(Color.White)
+                modifier = GlanceModifier
+                    .fillMaxSize()
+                    .background(Color.White)
+                    .appWidgetBackground()
             ) {
                 when (val state = widgetState) {
                     State.Loading -> CircularProgressIndicator()
@@ -66,6 +70,7 @@ private class GlanceMinimalWidget : GlanceAppWidget() {
                     State.Error -> ErrorMessage()
                 }
             }
+
             LaunchedEffect(Unit) { update(context) }
         }
     }

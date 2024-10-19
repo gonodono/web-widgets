@@ -51,28 +51,29 @@ private class RemoteViewsScrollFactory(
         }
 
         val size = context.widgetSize(appWidgetId)
-        if (listItem == null || currentSize != size) {
-            val result = runBlocking {
-                withTimeoutOrNull(SERVICE_TIMEOUT) {
-                    // Apparently RemoteViews straight from a collection Factory
-                    // aren't checked for the max allowed image size. Might want
-                    // to take extra precautions if using a bigger size in prod.
-                    webShooter.takeShot(url, size, false, 2.0F)
-                }
+        if (listItem != null && currentSize == size) return
+
+        val result = runBlocking {
+            withTimeoutOrNull(SERVICE_TIMEOUT) {
+
+                // Apparently RemoteViews straight from a collection Factory
+                // aren't checked for the max allowed image size. Might want
+                // to take extra precautions if using a bigger size in prod.
+                webShooter.takeShot(url, size, false, 2.0F)
             }
-            listItem = when (result) {
-                is WebShooter.WebShot -> {
-                    setUrl(context, appWidgetId, result.url)
-                    itemViews(context, result, appWidgetId)
-                }
-                is WebShooter.Error -> {
-                    if (BuildConfig.DEBUG) Log.e(TAG, result.message)
-                    errorViews(context)
-                }
-                null -> timeoutViews(context)
-            }
-            currentSize = size
         }
+        listItem = when (result) {
+            is WebShooter.WebShot -> {
+                setUrl(context, appWidgetId, result.url)
+                itemViews(context, result, appWidgetId)
+            }
+            is WebShooter.Error -> {
+                if (BuildConfig.DEBUG) Log.e(TAG, result.message)
+                errorViews(context)
+            }
+            null -> timeoutViews(context)
+        }
+        currentSize = size
     }
 
     override fun getCount(): Int = if (listItem != null) 1 else 0

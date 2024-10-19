@@ -64,6 +64,9 @@ class RemoteViewsScrollWidget : AppWidgetProvider() {
     }
 }
 
+// The API for collection Widgets just changed, but it's counterproductive to
+// mess with it here, so the two deprecation warnings about it are suppressed.
+
 internal fun AppWidgetManager.notifyListChanged(appWidgetId: Int) {
     @Suppress("DEPRECATION")
     notifyAppWidgetViewDataChanged(appWidgetId, R.id.list)

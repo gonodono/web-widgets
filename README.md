@@ -170,7 +170,7 @@ tall as possible, and provides a `LazyColumn` with a single item for the image.
   [`awaitDisplayFrames()`][awaitDisplayFrames] function to illustrate how that
   can be done.
 
-The demo's [current method][current-method] uses a `WebView` subclass to
+  The demo's [current method][current-method] uses a `WebView` subclass to
   monitor its own calls to `invalidate()`, which will be invisible to the
   framework, but which we can monitor for stoppage. A `Flow` and the
   `debounce()` operator allow us to make a decent guess as to when the `WebView`

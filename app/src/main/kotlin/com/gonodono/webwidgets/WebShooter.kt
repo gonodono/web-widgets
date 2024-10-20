@@ -7,6 +7,7 @@ import android.graphics.Point
 import android.os.Build
 import android.util.Log
 import android.util.Size
+import android.view.Choreographer
 import android.view.View
 import android.view.WindowManager
 import android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
@@ -22,6 +23,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collect
@@ -33,6 +35,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
@@ -49,6 +52,15 @@ internal class WebShooter(context: Context) {
     ) : Result
 
     data class Error(val message: String) : Result
+
+    sealed interface DrawDelay {
+        data class Time(val time: Long = 100L) : DrawDelay
+        data class Frames(val count: Int = 10) : DrawDelay
+        data class Invalidations(
+            val debounceTimeout: Long = 100L,
+            val completionTimeout: Long = 2_000L
+        ) : DrawDelay
+    }
 
 
     private val context: Context = context.applicationContext
@@ -78,8 +90,8 @@ internal class WebShooter(context: Context) {
         url: String,
         targetSize: Size,
         fitTargetHeight: Boolean,
-        screenAreaMultiplier: Float = 1.45F,  // Widget API sets max at 1.5F.
-        invalidationsDebounceTimeout: Long = 100L  // Seems to be good for most.
+        screenAreaMultiplier: Float = 1.45F,  // Widget API max is 1.5F.
+        drawDelay: DrawDelay = DrawDelay.Invalidations()
     ): Result {
 
         check(canDraw) { "Cannot draw" }
@@ -123,7 +135,22 @@ internal class WebShooter(context: Context) {
                 if (imageHeight <= 0) return Error("Layout error")
 
                 web.awaitLayout(screenSize.width, viewHeight)
-                web.awaitInvalidations(invalidationsDebounceTimeout)
+
+                when (drawDelay) {
+                    is DrawDelay.Time -> {
+                        delay(drawDelay.time)
+                        coroutineContext.ensureActive()
+                    }
+                    is DrawDelay.Frames -> {
+                        awaitDisplayFrames(drawDelay.count)
+                    }
+                    is DrawDelay.Invalidations -> {
+                        web.awaitInvalidations(
+                            drawDelay.debounceTimeout,
+                            drawDelay.completionTimeout
+                        )
+                    }
+                }
 
                 val bitmap = web.drawBitmap(imageWidth, imageHeight, downScale)
 
@@ -153,12 +180,18 @@ private class ShooterWebView(context: Context) : WebView(context) {
     )
 
     @OptIn(FlowPreview::class)
-    suspend fun awaitInvalidations(debounceTimeout: Long) =
-        invalidations
-            .onEach { coroutineContext.ensureActive() }
-            .debounce(debounceTimeout)
-            .take(1)
-            .collect()
+    suspend fun awaitInvalidations(
+        debounceTimeout: Long,
+        completionTimeout: Long
+    ) {
+        withTimeoutOrNull(completionTimeout) {
+            invalidations
+                .onEach { coroutineContext.ensureActive() }
+                .debounce(debounceTimeout)
+                .take(1)
+                .collect()
+        }
+    }
 
     override fun invalidate() {
         invalidations.tryEmit(Unit)
@@ -233,6 +266,32 @@ internal suspend fun WebView.awaitLayout(width: Int, height: Int) {
                 }
             )
             layout(0, 0, width, height)
+        }
+    }
+}
+
+// Waits at least count frames, possibly up to count + 1.
+internal suspend fun awaitDisplayFrames(count: Int) {
+    if (count <= 0) return
+
+    withContext(Dispatchers.Main) {
+        var frames = count
+        val choreographer = Choreographer.getInstance()
+        suspendCancellableCoroutine { continuation ->
+            val callback = object : Choreographer.FrameCallback {
+                override fun doFrame(it: Long) {
+                    ensureActive()
+                    if (frames-- > 0) {
+                        choreographer.postFrameCallback(this)
+                    } else {
+                        if (continuation.isActive) continuation.resume(Unit)
+                    }
+                }
+            }
+            continuation.invokeOnCancellation {
+                choreographer.removeFrameCallback(callback)
+            }
+            choreographer.postFrameCallback(callback)
         }
     }
 }

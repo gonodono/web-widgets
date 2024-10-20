@@ -162,32 +162,28 @@ tall as possible, and provides a `LazyColumn` with a single item for the image.
   anyway because invalidation calls go up and down the hierarchy, and this setup
   will abort them at the `FrameLayout` because it has zero visible area.
 
-  If you use something like the Minimal setups and find that your page isn't
-  fully prepared before the draw, it might be simplest to add a short `delay()`
-  after the `awaitLayout()` call. If you'd prefer something like the
-  invalidation approach, we can use `Choreographer` to get frame callbacks and
-  suspend over as many as we like. The project includes the
-  [`awaitDisplayFrames()`][awaitDisplayFrames] function to illustrate how that
-  can be done.
+  The demo originally relied on `WebView`'s `VisualStateCallback` as a readiness
+  indicator. That callback apparently fires soon after anything can be drawn,
+  whether the render is complete or not, so it takes some guessing as to the
+  appropriate delay. It's still useful, though, as an indication that the visual
+  structure is pretty well mapped out, so we can get a height measure after it.
 
-  The demo's [current method][current-method] uses a `WebView` subclass to
-  monitor its own calls to `invalidate()`, which will be invisible to the
-  framework, but which we can monitor for stoppage. A `Flow` and the
-  `debounce()` operator allow us to make a decent guess as to when the `WebView`
-  is done signaling that it's updated. This seems to be much more reliable than
-  the previous method, at least in my simple tests.
+  Waiting for the full render is a different matter, and seemingly it must
+  involve some guesswork no matter how it's handled. Presently, the demo has
+  three different options for the delay method, defined in the
+  [`sealed interface DrawDelay`][draw-delay].
 
-  The [previous method][previous-method] is quite similar to the current one,
-  however it relies on `WebView`'s `VisualStateCallback` as a readiness
-  indicator. That callback apparently fires as soon as anything can be drawn,
-  whether the page is complete or not, so it takes some guessing as to the
-  appropriate delay. If you want to give the previous method a try, be aware
-  that its `awaitDisplayFrames()` has a bug, and you should use the current one.
+  - `Time` uses a simple `delay()` with an exact number of milliseconds.
+  - `Frames` waits for the specified number of display frames to elapse, per
+    `Choreographer`.
+  - `Invalidations` monitors the `WebView`'s own `invalidate()` calls, and uses
+    a `Flow` and `debounce()` to guess when it's done updating.
 
-  It's true that we could make a flow out of those visual callbacks that's
-  similar to the invalidation flow, and the current method does involve some
-  guessing too, but overall the `invalidate()` tracking seems easier to manage
-  and tweak.
+  `Invalidations` seems to be the most reliable, at least in my simple tests,
+  but it assumes a static page. If you're loading something with animations or
+  long-running scripts or the like, the `invalidate()` calls aren't going to be
+  a reliable indicator. `Time`'s delay is probably the most intuitive option
+  after that one, but there are likely cases where `Frames` makes more sense.
 
 - There's apparently some issue with older emulators that can cause most pages
   to render blank, for some reason. I think it starts around Pie, going back in
@@ -250,8 +246,4 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
   [cts-helper]: https://cs.android.com/android/platform/superproject/main/+/main:cts/tests/tests/uirendering/src/android/uirendering/cts/util/WebViewReadyHelper.java
 
-  [awaitDisplayFrames]: app/src/main/kotlin/com/gonodono/webwidgets/Common.kt#L32
-
-  [current-method]: app/src/main/kotlin/com/gonodono/webwidgets/WebShooter.kt#L95
-
-  [previous-method]: https://github.com/gonodono/web-widgets/blob/6b424620626b00d5c34bc14c7ec240d732f50218/app/src/main/kotlin/com/gonodono/webwidgets/WebShooter.kt#L90
+  [draw-delay]: app/src/main/kotlin/com/gonodono/webwidgets/WebShooter.kt#L56

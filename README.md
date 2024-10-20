@@ -170,18 +170,19 @@ tall as possible, and provides a `LazyColumn` with a single item for the image.
   [`awaitDisplayFrames()`][awaitDisplayFrames] function to illustrate how that
   can be done.
 
-  The demo's current method uses a `WebView` subclass to monitor its own calls
-  to `invalidate()`, which would be invisible to the framework, but which we can
-  monitor for when they stop. A `Flow` and the `debounce()` operator allow us to
-  make a decent guess as to when the `WebView` is done updating. This seems to
-  be much more reliable than the previous method, at least in my simple tests.
+The demo's [current method][current-method] uses a `WebView` subclass to
+  monitor its own calls to `invalidate()`, which will be invisible to the
+  framework, but which we can monitor for stoppage. A `Flow` and the
+  `debounce()` operator allow us to make a decent guess as to when the `WebView`
+  is done signaling that it's updated. This seems to be much more reliable than
+  the previous method, at least in my simple tests.
 
-  [The previous method][previous-method] is quite similar to the current one.
-  However, it relies on `WebView`'s `VisualStateCallback` as a readiness
-  indicator, and that apparently fires as soon as it can draw anything, whether
-  the page is complete or not, so it takes some guessing as to the appropriate
-  delay. If you want to give the previous method a try, be aware that its
-  `awaitDisplayFrames()` has a bug, and you should use the current one.
+  The [previous method][previous-method] is quite similar to the current one,
+  however it relies on `WebView`'s `VisualStateCallback` as a readiness
+  indicator. That callback apparently fires as soon as anything can be drawn,
+  whether the page is complete or not, so it takes some guessing as to the
+  appropriate delay. If you want to give the previous method a try, be aware
+  that its `awaitDisplayFrames()` has a bug, and you should use the current one.
 
   It's true that we could make a flow out of those visual callbacks that's
   similar to the invalidation flow, and the current method does involve some
@@ -251,4 +252,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
   [awaitDisplayFrames]: app/src/main/kotlin/com/gonodono/webwidgets/Common.kt#L32
 
-  [previous-method]: blob/6b424620626b00d5c34bc14c7ec240d732f50218/app/src/main/kotlin/com/gonodono/webwidgets/WebShooter.kt#L231
+  [current-method]: app/src/main/kotlin/com/gonodono/webwidgets/WebShooter.kt#L95
+
+  [previous-method]: https://github.com/gonodono/web-widgets/blob/6b424620626b00d5c34bc14c7ec240d732f50218/app/src/main/kotlin/com/gonodono/webwidgets/WebShooter.kt#L90

@@ -7,7 +7,6 @@ import android.graphics.Point
 import android.os.Build
 import android.util.Log
 import android.util.Size
-import android.view.Choreographer
 import android.view.View
 import android.view.WindowManager
 import android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
@@ -20,8 +19,15 @@ import android.widget.FrameLayout
 import androidx.core.graphics.applyCanvas
 import androidx.core.graphics.withScale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
@@ -30,6 +36,7 @@ import kotlinx.coroutines.withContext
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
+import kotlin.math.roundToInt
 
 internal class WebShooter(context: Context) {
 
@@ -48,7 +55,7 @@ internal class WebShooter(context: Context) {
 
     private var frameLayout: FrameLayout? = null
 
-    private var webView: WebView? = null
+    private var webView: ShooterWebView? = null
 
     var canDraw: Boolean = false
         private set
@@ -59,10 +66,7 @@ internal class WebShooter(context: Context) {
     suspend fun initialize() = withContext(Dispatchers.Main) {
         val frame = FrameLayout(context)
         if (frame.addToWindowManager() && frame.removeFromWindowManager()) {
-            webView = WebView(context).also { view ->
-                view.isVerticalScrollBarEnabled = false
-                frame.addView(view)
-            }
+            webView = ShooterWebView(context).also { frame.addView(it) }
             frameLayout = frame
             canDraw = true
         }
@@ -74,7 +78,8 @@ internal class WebShooter(context: Context) {
         url: String,
         targetSize: Size,
         fitTargetHeight: Boolean,
-        screenAreaMultiplier: Float = 1.45F  // Max 1.5F
+        screenAreaMultiplier: Float = 1.45F,  // Widget API sets max at 1.5F.
+        invalidationsDebounceTimeout: Long = 100L  // Seems to be good for most.
     ): Result {
 
         check(canDraw) { "Cannot draw" }
@@ -88,78 +93,80 @@ internal class WebShooter(context: Context) {
             if (frame.addToWindowManager()) try {
 
                 val web = webView!!
-                val current = web.awaitLoadUrl(url)
+                val loaded = web.awaitLoadUrl(url)
                 coroutineContext.ensureActive()
-                if (current == null) return Error("Load error")
+                if (loaded == null) return Error("Load error")
 
-                val imageSpecs = web.performLayouts(
-                    targetSize,
-                    fitTargetHeight,
-                    screenAreaMultiplier
-                )
-                coroutineContext.ensureActive()
-                if (imageSpecs.height <= 0) return Error("Layout error")
+                val imageWidth = targetSize.width
+                val screenSize = context.screenSize()
+                val downScale = imageWidth.toFloat() / screenSize.width
 
-                awaitDisplayFrames(10)  // Arbitrary count for the demo.
+                val imageHeight: Int
+                val viewHeight: Int
+                val overflows: Boolean
+                if (fitTargetHeight) {
+                    imageHeight = targetSize.height
+                    viewHeight = (imageHeight / downScale).toInt()
+                    overflows = false
+                } else {
+                    web.awaitLayout(screenSize.width, screenSize.height)
+                    val contentHeightPx = web.contentHeightPx()
+                    val desiredHeight = (contentHeightPx * downScale).toInt()
+                    val screenArea = screenSize.width * screenSize.height
+                    val maxArea = screenArea * screenAreaMultiplier
+                    val maxHeight = (maxArea / imageWidth).toInt()
+                    val maxViewHeight = (maxHeight / downScale).toInt()
+                    imageHeight = minOf(desiredHeight, maxHeight)
+                    viewHeight = minOf(contentHeightPx, maxViewHeight)
+                    overflows = desiredHeight > maxHeight
+                }
+                if (imageHeight <= 0) return Error("Layout error")
 
-                val bitmap = web.drawToBitmap(
-                    imageSpecs.width,
-                    imageSpecs.height,
-                    imageSpecs.downScale
-                )
-                coroutineContext.ensureActive()
+                web.awaitLayout(screenSize.width, viewHeight)
+                web.awaitInvalidations(invalidationsDebounceTimeout)
 
-                return WebShot(current, bitmap, imageSpecs.overflows)
+                val bitmap = web.drawBitmap(imageWidth, imageHeight, downScale)
+
+                return WebShot(loaded, bitmap, overflows)
             } finally {
                 withContext(NonCancellable) {
                     frame.removeFromWindowManager()
                 }
-            }
-            else return Error("WindowManager error")
+            } else return Error("WindowManager error")
         }
     }
+}
 
-    private suspend fun WebView.performLayouts(
-        targetSize: Size,
-        fitTargetHeight: Boolean,
-        screenAreaMultiplier: Float
-    ): ImageSpecs = withContext(Dispatchers.Main) {
+private class ShooterWebView(context: Context) : WebView(context) {
 
-        val imageWidth = targetSize.width
-        val screenSize = context.screenSize()
-        val downScale = imageWidth.toFloat() / screenSize.width
-
-        val imageHeight: Int
-        val viewHeight: Int
-        val overflows: Boolean
-        if (fitTargetHeight) {
-            imageHeight = targetSize.height
-            viewHeight = (imageHeight / downScale).toInt()
-            overflows = false
-        } else {
-            awaitLayout(screenSize.width, screenSize.height)
-            val density = context.resources.displayMetrics.density
-            val contentHeightPx = (contentHeight * density).toInt()
-            val desiredHeight = (contentHeightPx * downScale).toInt()
-            val screenArea = screenSize.width * screenSize.height
-            val maxArea = screenArea * screenAreaMultiplier
-            val maxHeight = (maxArea / imageWidth).toInt()
-            val maxViewHeight = (maxHeight / downScale).toInt()
-            imageHeight = minOf(desiredHeight, maxHeight)
-            viewHeight = minOf(contentHeightPx, maxViewHeight)
-            overflows = desiredHeight > maxHeight
-        }
-        awaitLayout(screenSize.width, viewHeight)
-
-        ImageSpecs(imageWidth, imageHeight, downScale, overflows)
+    init {
+        isVerticalScrollBarEnabled = false
     }
 
-    private class ImageSpecs(
-        val width: Int,
-        val height: Int,
-        val downScale: Float,
-        val overflows: Boolean
+    suspend fun contentHeightPx(): Int = withContext(Dispatchers.Main) {
+        (contentHeight * context.resources.displayMetrics.density).roundToInt()
+    }
+
+    private val invalidations = MutableSharedFlow<Unit>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_LATEST
     )
+
+    @OptIn(FlowPreview::class)
+    suspend fun awaitInvalidations(debounceTimeout: Long) =
+        invalidations
+            .onEach { coroutineContext.ensureActive() }
+            .debounce(debounceTimeout)
+            .take(1)
+            .collect()
+
+    override fun invalidate() {
+        invalidations.tryEmit(Unit)
+    }
+
+    fun drawBitmap(width: Int, height: Int, scale: Float): Bitmap =
+        Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            .applyCanvas { withScale(scale, scale) { draw(this) } }
 }
 
 internal suspend fun View.addToWindowManager(): Boolean =
@@ -213,7 +220,9 @@ internal suspend fun WebView.awaitLoadUrl(url: String): String? =
         }
     }
 
-internal suspend fun WebView.awaitLayout(width: Int, height: Int) =
+internal suspend fun WebView.awaitLayout(width: Int, height: Int) {
+    if (this.width == width && this.height == height) return
+
     withContext(Dispatchers.Main) {
         suspendCancellableCoroutine { continuation ->
             postVisualStateCallback(
@@ -226,40 +235,6 @@ internal suspend fun WebView.awaitLayout(width: Int, height: Int) =
             layout(0, 0, width, height)
         }
     }
-
-// Waits at least frameCount, possibly up to frameCount + 1.
-internal suspend fun awaitDisplayFrames(frameCount: Int) {
-    check(frameCount > 0) { "frameCount must be positive" }
-
-    withContext(Dispatchers.Main) {
-        var count = frameCount
-        val choreographer = Choreographer.getInstance()
-        suspendCancellableCoroutine { continuation ->
-            val callback = object : Choreographer.FrameCallback {
-                override fun doFrame(it: Long) {
-                    if (count-- > 0) {
-                        choreographer.postFrameCallback(this)
-                    } else {
-                        if (continuation.isActive) continuation.resume(Unit)
-                    }
-                }
-            }
-            continuation.invokeOnCancellation {
-                choreographer.removeFrameCallback(callback)
-                ensureActive()
-            }
-            choreographer.postFrameCallback(callback)
-        }
-    }
-}
-
-private suspend fun WebView.drawToBitmap(
-    width: Int,
-    height: Int,
-    scale: Float
-): Bitmap = withContext(Dispatchers.Default) {
-    Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        .applyCanvas { withScale(scale, scale) { draw(this) } }
 }
 
 internal fun Context.screenSize(): Size =

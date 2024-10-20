@@ -162,12 +162,31 @@ tall as possible, and provides a `LazyColumn` with a single item for the image.
   anyway because invalidation calls go up and down the hierarchy, and this setup
   will abort them at the `FrameLayout` because it has zero visible area.
 
-  If you do find that your page isn't fully prepared before the draw, it might
-  be simplest to add a short `delay()` after `WebShooter`'s `performLayouts()`
-  call. If you'd prefer something like the invalidation approach, we can use
-  `Choreographer` to get frame callbacks and suspend over as many as we like.
-  The demo illustrates this last method with its
-  [`awaitDisplayFrames()`][awaitDisplayFrames] function.
+  If you use something like the Minimal setups and find that your page isn't
+  fully prepared before the draw, it might be simplest to add a short `delay()`
+  after the `awaitLayout()` call. If you'd prefer something like the
+  invalidation approach, we can use `Choreographer` to get frame callbacks and
+  suspend over as many as we like. The project includes the
+  [`awaitDisplayFrames()`][awaitDisplayFrames] function to illustrate how that
+  can be done.
+
+  The demo's current method uses a `WebView` subclass to monitor its own calls
+  to `invalidate()`, which would be invisible to the framework, but which we can
+  monitor for when they stop. A `Flow` and the `debounce()` operator allow us to
+  make a decent guess as to when the `WebView` is done updating. This seems to
+  be much more reliable than the previous method, at least in my simple tests.
+
+  [The previous method][previous-method] is quite similar to the current one.
+  However, it relies on `WebView`'s `VisualStateCallback` as a readiness
+  indicator, and that apparently fires as soon as it can draw anything, whether
+  the page is complete or not, so it takes some guessing as to the appropriate
+  delay. If you want to give the previous method a try, be aware that its
+  `awaitDisplayFrames()` has a bug, and you should use the current one.
+
+  It's true that we could make a flow out of those visual callbacks that's
+  similar to the invalidation flow, and the current method does involve some
+  guessing too, but overall the `invalidate()` tracking seems easier to manage
+  and tweak.
 
 - There's apparently some issue with older emulators that can cause most pages
   to render blank, for some reason. I think it starts around Pie, going back in
@@ -210,24 +229,26 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
   [so-post]: https://stackoverflow.com/a/33981965
 
-  [web-shooter]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/WebShooter.kt
+  [web-shooter]: app/src/main/kotlin/com/gonodono/webwidgets/WebShooter.kt
 
   [sample]: https://github.com/android/user-interface-samples/tree/main/AppWidget/app/src/main/java/com/example/android/appwidget/glance/image
 
-  [remoteviews-minimal]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/remoteviews/minimal/RemoteViewsMinimalWidget.kt
+  [remoteviews-minimal]: app/src/main/kotlin/com/gonodono/webwidgets/remoteviews/minimal/RemoteViewsMinimalWidget.kt
 
-  [remoteviews-simple]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/remoteviews/simple/RemoteViewsSimpleWidget.kt
+  [remoteviews-simple]: app/src/main/kotlin/com/gonodono/webwidgets/remoteviews/simple/RemoteViewsSimpleWidget.kt
 
-  [remoteviews-scroll]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/remoteviews/scroll/RemoteViewsScrollWidget.kt
+  [remoteviews-scroll]: app/src/main/kotlin/com/gonodono/webwidgets/remoteviews/scroll/RemoteViewsScrollWidget.kt
 
-  [glance-minimal]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/glance/minimal/GlanceMinimalWidget.kt
+  [glance-minimal]: app/src/main/kotlin/com/gonodono/webwidgets/glance/minimal/GlanceMinimalWidget.kt
 
-  [glance-base]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/glance/BaseGlanceWidget.kt
+  [glance-base]: app/src/main/kotlin/com/gonodono/webwidgets/glance/BaseGlanceWidget.kt
 
-  [glance-simple]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/glance/simple/GlanceSimpleWidget.kt
+  [glance-simple]: app/src/main/kotlin/com/gonodono/webwidgets/glance/simple/GlanceSimpleWidget.kt
 
-  [glance-scroll]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/glance/scroll/GlanceScrollWidget.kt
+  [glance-scroll]: app/src/main/kotlin/com/gonodono/webwidgets/glance/scroll/GlanceScrollWidget.kt
 
   [cts-helper]: https://cs.android.com/android/platform/superproject/main/+/main:cts/tests/tests/uirendering/src/android/uirendering/cts/util/WebViewReadyHelper.java
 
-  [awaitDisplayFrames]: https://github.com/gonodono/web-widgets/blob/main/app/src/main/kotlin/com/gonodono/webwidgets/WebShooter.kt#L231
+  [awaitDisplayFrames]: app/src/main/kotlin/com/gonodono/webwidgets/Common.kt#L32
+
+  [previous-method]: blob/6b424620626b00d5c34bc14c7ec240d732f50218/app/src/main/kotlin/com/gonodono/webwidgets/WebShooter.kt#L231

@@ -13,7 +13,7 @@ import kotlin.coroutines.resume
 internal const val TAG = "WebWidgets"
 
 internal const val WIKIPEDIA_RANDOM_URL =
-    "https://news.google.com"
+    "https://en.m.wikipedia.org/wiki/Special:Random"
 
 internal const val ACTION_OPEN = "${BuildConfig.APPLICATION_ID}.action.OPEN"
 

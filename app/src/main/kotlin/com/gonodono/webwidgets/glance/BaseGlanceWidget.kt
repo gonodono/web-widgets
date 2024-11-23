@@ -166,9 +166,10 @@ internal abstract class BaseGlanceWidget : GlanceAppWidget() {
 abstract class BaseGlanceWidgetReceiver : GlanceAppWidgetReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
-        when (intent.action) {
-            ACTION_OPEN -> handleActionOpen(context, intent)
-            else -> super.onReceive(context, intent)
+        if (intent.action == ACTION_OPEN) {
+            handleActionOpen(context, intent)
+        } else {
+            super.onReceive(context, intent)
         }
     }
 }

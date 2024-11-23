@@ -43,14 +43,15 @@ details there that I've overlooked here, and vice versa.
   `WebView` is instantiated and, in order to enable rendering, attached to
   `WindowManager` inside a zero-by-zero `FrameLayout`. A page is then loaded,
   laid out, and drawn to a `Bitmap` that's displayed in the Widget, after which
-  everything is cleaned up. For the non-Minimal ones, this is all consolidated
-  into a single helper class named [`WebShooter`][web-shooter].
+  everything is cleaned up. For the non-Minimal ones, this is consolidated in a
+  separate helper class named [`WebShooter`][web-shooter].
 
 - Neither framework's examples really do much as far as data persistence goes.
   The `RemoteViews` versions do save state to disk, but only because
   `AppWidgetProvider` instances are short-lived, and a new one is created for
-  each Widget action. The Glance versions manage to use only runtime variables,
-  because `GlanceAppWidget`s hang around until the process is killed.
+  each Widget action. The Glance versions manage to use only runtime variables
+  because `GlanceAppWidget`s hang around until the process is killed, which is
+  sufficient for a demo but probably not so for production.
 
 - All of the examples assume that the page will load relatively quickly. Each
   one uses only the time available to it from its own component; i.e., there are
@@ -88,7 +89,7 @@ rather than the screen, to cut down on overhead.
 
 This one launches a coroutine from `onUpdate()` like the Minimal one, with the
 same ~10-second timeout, but its `WebView` operations and draw routine are all
-contained in the `WebShooter` class.
+handled in the `WebShooter` class.
 
 ### Scroll
 
@@ -100,8 +101,8 @@ more complicated than it sounds. The only scrolling containers allowed in
 `RemoteViewsService` and `RemoteViewsFactory`, too.
 
 The `WebShooter` work is handled in the `RemoteViewsFactory`, so there's plenty
-of time available, but it's capped at 40 seconds here to match the timeout for
-the Glance Widgets.
+of time available, but it's capped at 40 seconds to match the timeout for the
+Glance Widgets.
 
 Because of the unique setup here, this one ends up with a slightly different UI
 if it errors or times out, as those messages are displayed in `ListView` items.
@@ -132,10 +133,11 @@ similar busy indicator and static results.
 <sup>[`BaseGlanceWidget`][glance-base],
 [`GlanceSimpleWidget`][glance-simple]</sup>
 
-Thanks to Glance's abstractions, the Simple and Scroll versions are nearly
-identical. Both inherit from `BaseGlanceWidget`, which handles all of the
-`WebShooter` work. `GlanceSimpleWidget` just tells the base class that the image
-should fit the Widget's height, and then provides a static image `Composable`.
+Thanks to Glance's abstractions, the Simple and Scroll implementations are
+nearly identical, and their common functionality is contained in
+`BaseGlanceWidget`, which handles all of the `WebShooter` work.
+`GlanceSimpleWidget` just tells the base class that the image should fit the
+Widget's height, and then provides a static image `Composable`.
 
 ### Scroll
 
@@ -162,22 +164,22 @@ tall as possible, and provides a `LazyColumn` with a single item for the image.
   anyway because invalidation calls go up and down the hierarchy, and this setup
   will abort them at the `FrameLayout` because it has zero visible area.
 
-  The demo originally relied on `WebView`'s `VisualStateCallback` as a readiness
-  indicator. That callback apparently fires soon after anything can be drawn,
-  whether the render is complete or not, so it takes some guessing as to the
-  appropriate delay. It's still useful, though, as an indication that the visual
-  structure is pretty well mapped out, so we can get a height measure after it.
+  The demo originally used only `VisualStateCallback` as a readiness indicator,
+  but that callback apparently fires soon after anything can be drawn, whether
+  the render is complete or not, so it takes some guessing as to an appropriate
+  delay. It's still useful, though, as an indication that the visual structure
+  is pretty well mapped out, so we can get a height measure after it.
 
-  Waiting for the full render is a different matter, and seemingly it must
-  involve some guesswork no matter how it's handled. Presently, the demo has
-  three different options for the delay method, defined in the
+  Waiting for the full render is a different matter, and seemingly must involve
+  some guesswork no matter how it's handled. Presently, the demo has three
+  different options for the delay method, defined in the
   [`sealed interface DrawDelay`][draw-delay].
 
   - `Time` uses a simple `delay()` with an exact number of milliseconds.
   - `Frames` waits for the specified number of display frames to elapse, per
     `Choreographer`.
   - `Invalidations` monitors the `WebView`'s own `invalidate()` calls, and uses
-    a `Flow` and `debounce()` to guess when it's done updating.
+    a `Flow` and `debounce()` to guess when it's done updating itself.
 
   `Invalidations` seems to be the most reliable, at least in my simple tests,
   but it assumes a static page. If you're loading something with animations or

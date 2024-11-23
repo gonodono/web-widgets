@@ -54,7 +54,7 @@ internal class WebShooter(context: Context) {
     data class Error(val message: String) : Result
 
     sealed interface DrawDelay {
-        data class Time(val time: Long = 100L) : DrawDelay
+        data class Time(val millis: Long = 100L) : DrawDelay
         data class Frames(val count: Int = 10) : DrawDelay
         data class Invalidations(
             val debounceTimeout: Long = 100L,
@@ -137,13 +137,8 @@ internal class WebShooter(context: Context) {
                 web.awaitLayout(screenSize.width, viewHeight)
 
                 when (drawDelay) {
-                    is DrawDelay.Time -> {
-                        delay(drawDelay.time)
-                        coroutineContext.ensureActive()
-                    }
-                    is DrawDelay.Frames -> {
-                        awaitDisplayFrames(drawDelay.count)
-                    }
+                    is DrawDelay.Time -> delay(drawDelay.millis)
+                    is DrawDelay.Frames -> awaitFrames(drawDelay.count)
                     is DrawDelay.Invalidations -> {
                         web.awaitInvalidations(
                             drawDelay.debounceTimeout,
@@ -271,7 +266,7 @@ internal suspend fun WebView.awaitLayout(width: Int, height: Int) {
 }
 
 // Waits at least count frames, possibly up to count + 1.
-internal suspend fun awaitDisplayFrames(count: Int) {
+internal suspend fun awaitFrames(count: Int) {
     if (count <= 0) return
 
     withContext(Dispatchers.Main) {

@@ -1,8 +1,8 @@
 [versions]
-agp = "8.7.1"
+agp = "8.7.2"
 kotlin = "2.0.21"
-coreKtx = "1.13.1"
-compose = "2024.10.00"
+coreKtx = "1.15.0"
+compose = "2024.11.00"
 activityCompose = "1.9.3"
 glance = "1.1.1"
 

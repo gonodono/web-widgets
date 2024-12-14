@@ -37,7 +37,6 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.coroutines.coroutineContext
 import kotlin.coroutines.resume
 import kotlin.math.roundToInt
 
@@ -105,9 +104,7 @@ internal class WebShooter(context: Context) {
             if (frame.addToWindowManager()) try {
 
                 val web = webView!!
-                val loaded = web.awaitLoadUrl(url)
-                coroutineContext.ensureActive()
-                if (loaded == null) return Error("Load error")
+                val loaded = web.awaitLoadUrl(url) ?: return Error("Load error")
 
                 val imageWidth = targetSize.width
                 val screenSize = context.screenSize()
@@ -137,8 +134,12 @@ internal class WebShooter(context: Context) {
                 web.awaitLayout(screenSize.width, viewHeight)
 
                 when (drawDelay) {
-                    is DrawDelay.Time -> delay(drawDelay.millis)
-                    is DrawDelay.Frames -> awaitFrames(drawDelay.count)
+                    is DrawDelay.Time -> {
+                        delay(drawDelay.millis)
+                    }
+                    is DrawDelay.Frames -> {
+                        awaitFrames(drawDelay.count)
+                    }
                     is DrawDelay.Invalidations -> {
                         web.awaitInvalidations(
                             drawDelay.debounceTimeout,
@@ -159,6 +160,10 @@ internal class WebShooter(context: Context) {
     }
 }
 
+// This class exists only because of awaitInvalidations(). If you're not using
+// that delay option, the other settings and members can be pulled out of here
+// and applied to a regular WebView instance. The rest of the helper functions
+// have been kept separate below to make such modifications easier, if needed.
 private class ShooterWebView(context: Context) : WebView(context) {
 
     init {
@@ -240,7 +245,8 @@ internal suspend fun WebView.awaitLoadUrl(url: String): String? =
         suspendCancellableCoroutine { continuation ->
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
-                    if (continuation.isActive) continuation.resume(url)
+                    ensureActive()
+                    continuation.resume(url)
                 }
             }
             continuation.invokeOnCancellation { post { stopLoading() } }
@@ -256,7 +262,8 @@ internal suspend fun WebView.awaitLayout(width: Int, height: Int) {
             postVisualStateCallback(
                 0, object : WebView.VisualStateCallback() {
                     override fun onComplete(requestId: Long) {
-                        if (continuation.isActive) continuation.resume(Unit)
+                        ensureActive()
+                        continuation.resume(Unit)
                     }
                 }
             )
@@ -279,7 +286,7 @@ internal suspend fun awaitFrames(count: Int) {
                     if (frames-- > 0) {
                         choreographer.postFrameCallback(this)
                     } else {
-                        if (continuation.isActive) continuation.resume(Unit)
+                        continuation.resume(Unit)
                     }
                 }
             }

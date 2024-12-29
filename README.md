@@ -187,13 +187,6 @@ tall as possible, and provides a `LazyColumn` with a single item for the image.
   a reliable indicator. `Time`'s delay is probably the most intuitive option
   after that one, but there are likely cases where `Frames` makes more sense.
 
-- There's apparently some issue with older emulators that can cause most pages
-  to render blank, for some reason. I think it starts around Pie, going back in
-  the versions. There are various suggestions for solutions out there, but I
-  simply used `news.google.com` instead when testing on those because Google
-  sites seem to work just fine, not counting the stuff missing due to JavaScript
-  being disabled.
-
 - All of the Widgets currently use Wikipedia for their pages. I am not
   affiliated with The Wikimedia Foundation nor any of its sites or
   organizations. It is simply a reliable, lightweight site with a random page
@@ -248,4 +241,4 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
   [cts-helper]: https://cs.android.com/android/platform/superproject/main/+/main:cts/tests/tests/uirendering/src/android/uirendering/cts/util/WebViewReadyHelper.java
 
-  [draw-delay]: app/src/main/kotlin/com/gonodono/webwidgets/WebShooter.kt#L56
+  [draw-delay]: app/src/main/kotlin/com/gonodono/webwidgets/WebShooter.kt#L55

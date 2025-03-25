@@ -6,17 +6,16 @@ import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import android.util.Log
 import android.util.Size
 import android.widget.RemoteViews
+import androidx.core.content.edit
 import androidx.core.net.toUri
 import com.gonodono.webwidgets.ACTION_OPEN
-import com.gonodono.webwidgets.BuildConfig
 import com.gonodono.webwidgets.R
-import com.gonodono.webwidgets.TAG
 import com.gonodono.webwidgets.WIKIPEDIA_RANDOM_URL
 import com.gonodono.webwidgets.WebShooter
 import com.gonodono.webwidgets.handleActionOpen
+import com.gonodono.webwidgets.log
 import com.gonodono.webwidgets.remoteviews.ACTION_RELOAD
 import com.gonodono.webwidgets.remoteviews.RECEIVER_TIMEOUT
 import com.gonodono.webwidgets.remoteviews.appWidgetIdExtra
@@ -38,15 +37,14 @@ class RemoteViewsSimpleWidget : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             ACTION_OPEN -> handleActionOpen(context, intent)
+
             ACTION_RELOAD -> {
                 val appWidgetId = intent.appWidgetIdExtra
                 setUrl(context, appWidgetId, null)
-                updateWidgets(
-                    context,
-                    context.appWidgetManager,
-                    intArrayOf(appWidgetId)
-                )
+                val array = intArrayOf(appWidgetId)
+                updateWidgets(context, context.appWidgetManager, array)
             }
+
             else -> super.onReceive(context, intent)
         }
     }
@@ -55,9 +53,8 @@ class RemoteViewsSimpleWidget : AppWidgetProvider() {
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
-    ) {
+    ) =
         updateWidgets(context, appWidgetManager, appWidgetIds)
-    }
 
     override fun onAppWidgetOptionsChanged(
         context: Context,
@@ -77,7 +74,7 @@ class RemoteViewsSimpleWidget : AppWidgetProvider() {
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
-    ) {
+    ) =
         doAsync {
             val webShooter = WebShooter(context).apply { initialize() }
             val initial = if (webShooter.canDraw) {
@@ -109,16 +106,14 @@ class RemoteViewsSimpleWidget : AppWidgetProvider() {
                 )
             }
         }
-    }
 
-    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
-        context.widgetStates.edit().apply {
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) =
+        context.widgetStates.edit {
             appWidgetIds.forEach { id ->
                 remove(initializedKey(id))
                 remove(urlKey(id))
             }
-        }.apply()
-    }
+        }
 }
 
 private suspend fun contentViews(
@@ -129,7 +124,8 @@ private suspend fun contentViews(
 ): RemoteViews {
     val views = simpleWidgetViews(context, appWidgetId)
     val url = getUrl(context, appWidgetId) ?: WIKIPEDIA_RANDOM_URL
-    when (val result = webShooter.takeShot(url, size, true)) {
+    val result = webShooter.takeShot(url, size, true)
+    when (result) {
         is WebShooter.WebShot -> {
             setUrl(context, appWidgetId, result.url)
             views.setImageViewBitmap(R.id.image, result.bitmap)
@@ -140,21 +136,19 @@ private suspend fun contentViews(
                 RemoteViewsSimpleWidget::class.java
             )
             open.appWidgetIdExtra = appWidgetId
-            views.setOnClickPendingIntent(
-                R.id.image,
-                PendingIntent.getBroadcast(
-                    context,
-                    appWidgetId,
-                    open,
-                    PendingIntent.FLAG_IMMUTABLE
-                )
+            val pendingOpen = PendingIntent.getBroadcast(
+                context,
+                appWidgetId,
+                open,
+                PendingIntent.FLAG_IMMUTABLE
             )
+            views.setOnClickPendingIntent(R.id.image, pendingOpen)
             views.showView(R.id.image)
         }
 
         is WebShooter.Error -> {
-            if (BuildConfig.DEBUG) Log.e(TAG, result.message)
             views.showView(R.id.error)
+            log(result.message)
         }
     }
     return views
@@ -172,15 +166,13 @@ private fun simpleWidgetViews(context: Context, appWidgetId: Int): RemoteViews =
             RemoteViewsSimpleWidget::class.java
         )
         reload.appWidgetIdExtra = appWidgetId
-        setOnClickPendingIntent(
-            R.id.reload,
-            PendingIntent.getBroadcast(
-                context,
-                appWidgetId,
-                reload,
-                PendingIntent.FLAG_IMMUTABLE
-            )
+        val pendingReload = PendingIntent.getBroadcast(
+            context,
+            appWidgetId,
+            reload,
+            PendingIntent.FLAG_IMMUTABLE
         )
+        setOnClickPendingIntent(R.id.reload, pendingReload)
         showView(R.id.reload)
     }
 
@@ -193,9 +185,7 @@ private fun errorViews(context: Context): RemoteViews =
 private fun isInitialized(context: Context, appWidgetId: Int): Boolean =
     context.widgetStates.getBoolean(initializedKey(appWidgetId), false)
 
-private fun setInitialized(context: Context, appWidgetId: Int) {
-    context.widgetStates.edit()
-        .putBoolean(initializedKey(appWidgetId), true).apply()
-}
+private fun setInitialized(context: Context, appWidgetId: Int) =
+    context.widgetStates.edit { putBoolean(initializedKey(appWidgetId), true) }
 
 private fun initializedKey(appWidgetId: Int) = "initialized:$appWidgetId"

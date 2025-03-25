@@ -4,7 +4,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
-import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -34,22 +33,21 @@ import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.padding
-import androidx.glance.layout.size
 import androidx.glance.text.Text
 import androidx.glance.text.TextDefaults
 import androidx.glance.unit.ColorProvider
 import com.gonodono.webwidgets.ACTION_OPEN
-import com.gonodono.webwidgets.BuildConfig
 import com.gonodono.webwidgets.R
-import com.gonodono.webwidgets.TAG
 import com.gonodono.webwidgets.WIKIPEDIA_RANDOM_URL
 import com.gonodono.webwidgets.WebShooter
+import com.gonodono.webwidgets.log
 import com.gonodono.webwidgets.handleActionOpen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.math.roundToInt
 import android.util.Size as AndroidSize
 
 internal abstract class BaseGlanceWidget : GlanceAppWidget() {
@@ -103,7 +101,7 @@ internal abstract class BaseGlanceWidget : GlanceAppWidget() {
     private fun MainContent() {
         val context = LocalContext.current
         val size = with(Density(context)) { LocalSize.current.toSize() }
-            .run { AndroidSize(width.toInt(), height.toInt()) }
+            .run { AndroidSize(width.roundToInt(), height.roundToInt()) }
 
         Box(
             contentAlignment = when (widgetState) {
@@ -147,7 +145,7 @@ internal abstract class BaseGlanceWidget : GlanceAppWidget() {
                         State.Complete(result)
                     }
                     is WebShooter.Error -> {
-                        if (BuildConfig.DEBUG) Log.e(TAG, result.message)
+                        log(result.message)
                         State.Error
                     }
                     null -> State.Timeout
@@ -224,18 +222,12 @@ internal fun ErrorMessage() {
 
 @Composable
 private fun ReloadButton(onClick: () -> Unit) {
-    Box(modifier = GlanceModifier.padding(4.dp)) {
-        Box(
-            contentAlignment = Alignment.Center,
-            modifier = GlanceModifier
-                .size(40.dp)
-                .background(ImageProvider(R.drawable.circle))
-                .clickable(onClick)
-        ) {
-            Image(
-                provider = ImageProvider(R.drawable.reload),
-                contentDescription = "Reload"
-            )
-        }
-    }
+    Image(
+        provider = ImageProvider(R.drawable.reload),
+        contentDescription = "Reload",
+        modifier = GlanceModifier
+            .padding(12.dp)
+            .background(ImageProvider(R.drawable.circle))
+            .clickable(onClick)
+    )
 }

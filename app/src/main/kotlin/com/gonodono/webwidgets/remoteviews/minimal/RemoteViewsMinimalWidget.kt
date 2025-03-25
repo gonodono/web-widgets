@@ -30,41 +30,36 @@ class RemoteViewsMinimalWidget : AppWidgetProvider() {
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
-    ) {
-        doAsync { updateWidgets(context, appWidgetManager, appWidgetIds) }
-    }
+    ) =
+        doAsync {
+            appWidgetManager.updateWidgets(appWidgetIds, busyViews(context))
 
-    private suspend fun updateWidgets(
-        context: Context,
-        appWidgetManager: AppWidgetManager,
-        appWidgetIds: IntArray
-    ) {
-        appWidgetManager.updateWidgets(appWidgetIds, busyViews(context))
+            val views = RemoteViews(context.packageName, R.layout.widget_simple)
+            withTimeoutOrNull(RECEIVER_TIMEOUT) {
+                val frameLayout = FrameLayout(context)
+                if (frameLayout.addToWindowManager()) {
+                    try {
+                        val webView = withContext(Dispatchers.Main) {
+                            WebView(context).also { frameLayout.addView(it) }
+                        }
+                        webView.awaitLoadUrl(WIKIPEDIA_RANDOM_URL)
 
-        val views = RemoteViews(context.packageName, R.layout.widget_simple)
-        withTimeoutOrNull(RECEIVER_TIMEOUT) {
-            val frameLayout = FrameLayout(context)
-            if (frameLayout.addToWindowManager()) {
-                try {
-                    val webView = withContext(Dispatchers.Main) {
-                        WebView(context).also { frameLayout.addView(it) }
+                        val size = context.screenSize()
+                        webView.awaitLayout(size.width, size.height / 2)
+
+                        val bitmap = webView.drawToBitmap()
+                        views.setImageViewBitmap(R.id.image, bitmap)
+                        views.showView(R.id.image)
+                    } finally {
+                        withContext(NonCancellable) {
+                            frameLayout.removeFromWindowManager()
+                        }
                     }
-                    webView.awaitLoadUrl(WIKIPEDIA_RANDOM_URL)
-                    val size = context.screenSize()
-                    webView.awaitLayout(size.width, size.height / 2)
-                    val bitmap = webView.drawToBitmap()
-                    views.setImageViewBitmap(R.id.image, bitmap)
-                    views.showView(R.id.image)
-                } finally {
-                    withContext(NonCancellable) {
-                        frameLayout.removeFromWindowManager()
-                    }
+                } else {
+                    views.showView(R.id.error)
                 }
-            } else {
-                views.showView(R.id.error)
-            }
-        } ?: views.showView(R.id.timeout)
+            } ?: views.showView(R.id.timeout)
 
-        appWidgetManager.updateWidgets(appWidgetIds, views)
-    }
+            appWidgetManager.updateWidgets(appWidgetIds, views)
+        }
 }

@@ -41,7 +41,7 @@ class MainActivity : ComponentActivity() {
                     Text("Permission granted")
                 } else {
                     Text("Overlay permission required")
-                    Button(::openPermissions) { Text("Open permissions") }
+                    Button(::openPermissions) { Text("Open permission") }
                 }
             }
         }
@@ -52,10 +52,9 @@ class MainActivity : ComponentActivity() {
         hasPermission.value = Settings.canDrawOverlays(this)
     }
 
-    private fun openPermissions() = startActivity(
-        Intent(
-            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-            "package:$packageName".toUri()
-        )
-    )
+    private fun openPermissions() {
+        val uri = "package:$packageName".toUri()
+        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, uri)
+        startActivity(intent)
+    }
 }

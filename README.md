@@ -4,14 +4,13 @@ A demonstration of drawing rendered `WebView` content into App Widget images
 along with various features, for both `RemoteViews` and Glance.
 
 <p align="center">
-<img src="images/widgets.png"
-alt="Screenshots of emulators showing an instance of each non-Minimal Widget."
+<img src="images/widgets.png" 
+alt="Screenshots of emulators showing an instance of each non-Minimal Widget." 
 width="30%" />
 </p>
 
 This project contains complete working examples to supplement those outlined in
-[this Stack Overflow post][so-post]. There might be relevant information or
-details there that I've overlooked here, and vice versa.
+[this Stack Overflow post][so-post].
 
 <br />
 
@@ -151,6 +150,10 @@ tall as possible, and provides a `LazyColumn` with a single item for the image.
 
 ## Notes
 
+- Recent tooling updates are giving false `RestrictedApi` errors for Glance's
+  `ColorProvider`. Everything still builds correctly, though, so I'm not going
+  to bother with suppressing them for the time being.
+
 - One of the trickiest parts of this is figuring out when the `WebView` is ready
   to be drawn. Listening for the URL load to finish isn't enough, so a
   `VisualStateCallback` must be used, but even that doesn't appear to be
@@ -199,7 +202,7 @@ tall as possible, and provides a `LazyColumn` with a single item for the image.
 
 MIT License
 
-Copyright (c) 2024 Mike M.
+Copyright (c) 2025 Mike M.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -241,4 +244,4 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
   [cts-helper]: https://cs.android.com/android/platform/superproject/main/+/main:cts/tests/tests/uirendering/src/android/uirendering/cts/util/WebViewReadyHelper.java
 
-  [draw-delay]: app/src/main/kotlin/com/gonodono/webwidgets/WebShooter.kt#L55
+  [draw-delay]: app/src/main/kotlin/com/gonodono/webwidgets/WebShooter.kt#L52

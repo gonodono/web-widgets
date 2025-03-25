@@ -4,8 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 
-internal const val TAG = "WebWidgets"
-
 internal const val WIKIPEDIA_RANDOM_URL =
     "https://en.m.wikipedia.org/wiki/Special:Random"
 
@@ -17,6 +15,10 @@ internal fun handleActionOpen(context: Context, intent: Intent) {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         context.startActivity(view)
     } catch (e: Exception) {
-        if (BuildConfig.DEBUG) Log.e(TAG, "ACTION_VIEW error", e)
+        log("ACTION_VIEW error", e)
     }
+}
+
+internal fun log(message: String, throwable: Throwable? = null) {
+    if (BuildConfig.DEBUG) Log.d("WebWidgets", message, throwable)
 }

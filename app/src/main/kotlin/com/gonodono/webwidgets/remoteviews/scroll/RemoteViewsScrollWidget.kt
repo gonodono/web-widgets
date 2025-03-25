@@ -10,6 +10,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.widget.RemoteViews
+import androidx.core.content.edit
 import androidx.core.net.toUri
 import com.gonodono.webwidgets.ACTION_OPEN
 import com.gonodono.webwidgets.R
@@ -27,11 +28,13 @@ class RemoteViewsScrollWidget : AppWidgetProvider() {
     override fun onReceive(context: Context, intent: Intent) {
         when (intent.action) {
             ACTION_OPEN -> handleActionOpen(context, intent)
+
             ACTION_RELOAD -> {
                 val appWidgetId = intent.appWidgetIdExtra
                 setUrl(context, appWidgetId, null)
                 context.appWidgetManager.notifyListChanged(appWidgetId)
             }
+
             else -> super.onReceive(context, intent)
         }
     }
@@ -40,37 +43,33 @@ class RemoteViewsScrollWidget : AppWidgetProvider() {
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetIds: IntArray
-    ) {
+    ) =
         doAsync {
             appWidgetIds.forEach { id ->
                 updateWidget(context, appWidgetManager, id)
             }
         }
-    }
 
     override fun onAppWidgetOptionsChanged(
         context: Context,
         appWidgetManager: AppWidgetManager,
         appWidgetId: Int,
         newOptions: Bundle
-    ) {
+    ) =
         appWidgetManager.notifyListChanged(appWidgetId)
-    }
 
-    override fun onDeleted(context: Context, appWidgetIds: IntArray) {
-        context.widgetStates.edit().apply {
-            appWidgetIds.forEach { remove(urlKey(it)) }
-        }.apply()
-    }
+    override fun onDeleted(context: Context, appWidgetIds: IntArray) =
+        context.widgetStates.edit {
+            appWidgetIds.forEach { id -> remove(urlKey(id)) }
+        }
 }
 
 // The API for collection Widgets just changed, but it's counterproductive to
 // mess with it here, so the two deprecation warnings about it are suppressed.
 
-internal fun AppWidgetManager.notifyListChanged(appWidgetId: Int) {
+internal fun AppWidgetManager.notifyListChanged(appWidgetId: Int) =
     @Suppress("DEPRECATION")
     notifyAppWidgetViewDataChanged(appWidgetId, R.id.list)
-}
 
 private fun updateWidget(
     context: Context,
@@ -79,26 +78,28 @@ private fun updateWidget(
 ) {
     val views = RemoteViews(context.packageName, R.layout.widget_scroll_main)
     val adapter = Intent(context, RemoteViewsScrollService::class.java)
+
     adapter.appWidgetIdExtra = appWidgetId // <- Must do before toUri().
     adapter.setData(adapter.toUri(Intent.URI_INTENT_SCHEME).toUri())
+
     @Suppress("DEPRECATION")
     views.setRemoteAdapter(R.id.list, adapter)
     views.setEmptyView(R.id.list, R.id.progress)
+
     val open = Intent(
         ACTION_OPEN,
         null,
         context,
         RemoteViewsScrollWidget::class.java
     )
-    views.setPendingIntentTemplate(
-        R.id.list,
-        PendingIntent.getBroadcast(
-            context,
-            appWidgetId,
-            open,
-            FLAG_MUTABLE or FLAG_UPDATE_CURRENT
-        ),
+    val pendingOpen = PendingIntent.getBroadcast(
+        context,
+        appWidgetId,
+        open,
+        FLAG_MUTABLE or FLAG_UPDATE_CURRENT
     )
+    views.setPendingIntentTemplate(R.id.list, pendingOpen)
+
     val reload = Intent(
         ACTION_RELOAD,
         null,
@@ -106,14 +107,13 @@ private fun updateWidget(
         RemoteViewsScrollWidget::class.java
     )
     reload.appWidgetIdExtra = appWidgetId
-    views.setOnClickPendingIntent(
-        R.id.reload,
-        PendingIntent.getBroadcast(
-            context,
-            appWidgetId,
-            reload,
-            FLAG_IMMUTABLE
-        )
+    val pendingReload = PendingIntent.getBroadcast(
+        context,
+        appWidgetId,
+        reload,
+        FLAG_IMMUTABLE
     )
+    views.setOnClickPendingIntent(R.id.reload, pendingReload)
+
     appWidgetManager.updateAppWidget(appWidgetId, views)
 }

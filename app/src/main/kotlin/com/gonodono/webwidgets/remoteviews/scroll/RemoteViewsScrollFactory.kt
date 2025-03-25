@@ -2,17 +2,15 @@ package com.gonodono.webwidgets.remoteviews.scroll
 
 import android.content.Context
 import android.content.Intent
-import android.util.Log
 import android.util.Size
 import android.view.View
 import android.widget.RemoteViews
 import android.widget.RemoteViewsService
 import androidx.core.net.toUri
-import com.gonodono.webwidgets.BuildConfig
 import com.gonodono.webwidgets.R
-import com.gonodono.webwidgets.TAG
 import com.gonodono.webwidgets.WIKIPEDIA_RANDOM_URL
 import com.gonodono.webwidgets.WebShooter
+import com.gonodono.webwidgets.log
 import com.gonodono.webwidgets.remoteviews.appWidgetIdExtra
 import com.gonodono.webwidgets.remoteviews.appWidgetManager
 import com.gonodono.webwidgets.remoteviews.getUrl
@@ -57,8 +55,8 @@ private class RemoteViewsScrollFactory(
             withTimeoutOrNull(SERVICE_TIMEOUT) {
 
                 // Apparently RemoteViews straight from a collection Factory
-                // aren't checked for the max allowed image size. Might want
-                // to take extra precautions if using a bigger size in prod.
+                // aren't checked for the max allowed image size. Might want to
+                // take extra precautions if using a multiplier > 1.5F in prod.
                 webShooter.takeShot(url, size, false, 2.0F)
             }
         }
@@ -68,7 +66,7 @@ private class RemoteViewsScrollFactory(
                 itemViews(context, result, appWidgetId)
             }
             is WebShooter.Error -> {
-                if (BuildConfig.DEBUG) Log.e(TAG, result.message)
+                log(result.message)
                 errorViews(context)
             }
             null -> timeoutViews(context)

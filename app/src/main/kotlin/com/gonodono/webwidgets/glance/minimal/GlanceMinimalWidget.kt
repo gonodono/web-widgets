@@ -62,10 +62,9 @@ private class GlanceMinimalWidget : GlanceAppWidget() {
             ) {
                 when (val state = widgetState) {
                     State.Loading -> CircularProgressIndicator()
-                    is State.Complete -> Image(
-                        provider = ImageProvider(state.bitmap),
-                        contentDescription = "WebShot"
-                    )
+                    is State.Complete -> {
+                        Image(ImageProvider(state.bitmap), "WebShot")
+                    }
                     State.Timeout -> TimeoutMessage()
                     State.Error -> ErrorMessage()
                 }
@@ -84,8 +83,10 @@ private class GlanceMinimalWidget : GlanceAppWidget() {
                         WebView(context).also { frameLayout.addView(it) }
                     }
                     webView.awaitLoadUrl(WIKIPEDIA_RANDOM_URL)
+
                     val size = context.screenSize()
                     webView.awaitLayout(size.width, size.height / 2)
+
                     val bitmap = webView.drawToBitmap()
                     State.Complete(bitmap)
                 } finally {

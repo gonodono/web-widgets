@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="white">#FFFFFFFF</color>
-    <color name="sheer_white">#E8FFFFFF</color>
-    <color name="soft_blue">#FF4444FF</color>
-    <color name="control_gray">#FFD6D7D7</color>
+
+    <color name="white">#ffffffff</color>
+    <color name="sheer_white">#e8ffffff</color>
+    <color name="soft_blue">#ff4444ff</color>
+    <color name="control_gray">#ffd6d7d7</color>
+
+    <color name="ic_launcher_background">#fff8f8f8</color>
+
 </resources>

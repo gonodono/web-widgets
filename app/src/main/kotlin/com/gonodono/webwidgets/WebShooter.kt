@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.graphics.Point
 import android.os.Build
-import android.util.Log
 import android.util.Size
 import android.view.Choreographer
 import android.view.View
@@ -18,17 +17,16 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.core.graphics.applyCanvas
+import androidx.core.graphics.createBitmap
 import androidx.core.graphics.withScale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -36,7 +34,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.coroutines.cancellation.CancellationException
 import kotlin.coroutines.resume
 import kotlin.math.roundToInt
 
@@ -91,7 +88,7 @@ internal class WebShooter(context: Context) {
         fitTargetHeight: Boolean,
         screenAreaMultiplier: Float = 1.45F,  // Widget API max is 1.5F.
         drawDelay: DrawDelay = DrawDelay.Invalidations()
-    ): Result {
+    ): Result = mutex.withLock {
 
         check(canDraw) { "Cannot draw" }
         check(url.isNotBlank()) { "Blank or empty URL" }
@@ -99,71 +96,69 @@ internal class WebShooter(context: Context) {
             "Invalid size: $targetSize"
         }
 
-        mutex.withLock {
-            val frame = frameLayout!!
-            if (frame.addToWindowManager()) try {
+        val frame = frameLayout!!
+        if (!frame.addToWindowManager()) return Error("WindowManager error")
 
-                val web = webView!!
-                val loaded = web.awaitLoadUrl(url) ?: return Error("Load error")
+        try {
+            val web = webView!!
+            val loaded = web.awaitLoadUrl(url) ?: return Error("Load error")
 
-                val imageWidth = targetSize.width
-                val screenSize = context.screenSize()
-                val downScale = imageWidth.toFloat() / screenSize.width
+            val imageWidth = targetSize.width
+            val screenSize = context.screenSize()
+            val downScale = imageWidth.toFloat() / screenSize.width
 
-                val imageHeight: Int
-                val viewHeight: Int
-                val overflows: Boolean
-                if (fitTargetHeight) {
-                    imageHeight = targetSize.height
-                    viewHeight = (imageHeight / downScale).toInt()
-                    overflows = false
-                } else {
-                    web.awaitLayout(screenSize.width, screenSize.height)
-                    val contentHeightPx = web.contentHeightPx()
-                    val desiredHeight = (contentHeightPx * downScale).toInt()
-                    val screenArea = screenSize.width * screenSize.height
-                    val maxArea = screenArea * screenAreaMultiplier
-                    val maxHeight = (maxArea / imageWidth).toInt()
-                    val maxViewHeight = (maxHeight / downScale).toInt()
-                    imageHeight = minOf(desiredHeight, maxHeight)
-                    viewHeight = minOf(contentHeightPx, maxViewHeight)
-                    overflows = desiredHeight > maxHeight
+            val imageHeight: Int
+            val viewHeight: Int
+            val overflows: Boolean
+            if (fitTargetHeight) {
+                imageHeight = targetSize.height
+                viewHeight = (imageHeight / downScale).toInt()
+                overflows = false
+            } else {
+                web.awaitLayout(screenSize.width, screenSize.height)
+                val contentHeightPx = web.contentHeightPx()
+                val desiredHeight = (contentHeightPx * downScale).toInt()
+                val screenArea = screenSize.width * screenSize.height
+                val maxArea = screenArea * screenAreaMultiplier
+                val maxHeight = (maxArea / imageWidth).toInt()
+                val maxViewHeight = (maxHeight / downScale).toInt()
+                imageHeight = minOf(desiredHeight, maxHeight)
+                viewHeight = minOf(contentHeightPx, maxViewHeight)
+                overflows = desiredHeight > maxHeight
+            }
+            if (imageHeight <= 0) return Error("Layout error")
+
+            web.awaitLayout(screenSize.width, viewHeight)
+
+            when (drawDelay) {
+                is DrawDelay.Time -> {
+                    delay(drawDelay.millis)
                 }
-                if (imageHeight <= 0) return Error("Layout error")
-
-                web.awaitLayout(screenSize.width, viewHeight)
-
-                when (drawDelay) {
-                    is DrawDelay.Time -> {
-                        delay(drawDelay.millis)
-                    }
-                    is DrawDelay.Frames -> {
-                        awaitFrames(drawDelay.count)
-                    }
-                    is DrawDelay.Invalidations -> {
-                        web.awaitInvalidations(
-                            drawDelay.debounceTimeout,
-                            drawDelay.completionTimeout
-                        )
-                    }
+                is DrawDelay.Frames -> {
+                    awaitFrames(drawDelay.count)
                 }
-
-                val bitmap = web.drawBitmap(imageWidth, imageHeight, downScale)
-
-                return WebShot(loaded, bitmap, overflows)
-            } finally {
-                withContext(NonCancellable) {
-                    frame.removeFromWindowManager()
+                is DrawDelay.Invalidations -> {
+                    web.awaitInvalidations(
+                        drawDelay.debounceTimeout,
+                        drawDelay.completionTimeout
+                    )
                 }
-            } else return Error("WindowManager error")
+            }
+
+            val bitmap = web.drawBitmap(imageWidth, imageHeight, downScale)
+
+            return WebShot(loaded, bitmap, overflows)
+        } finally {
+            withContext(NonCancellable) {
+                frame.removeFromWindowManager()
+            }
         }
     }
 }
 
-// This class exists only because of awaitInvalidations(). If you're not using
-// that delay option, the other settings and members can be pulled out of here
-// and applied to a regular WebView instance. The rest of the helper functions
-// have been kept separate below to make such modifications easier, if needed.
+// This class exists only because of awaitInvalidations(). If you're not
+// using that delay option, the other settings and members can be pulled
+// out of here and applied to a regular WebView instance.
 private class ShooterWebView(context: Context) : WebView(context) {
 
     init {
@@ -185,11 +180,7 @@ private class ShooterWebView(context: Context) : WebView(context) {
         completionTimeout: Long
     ) {
         withTimeoutOrNull(completionTimeout) {
-            invalidations
-                .onEach { coroutineContext.ensureActive() }
-                .debounce(debounceTimeout)
-                .take(1)
-                .collect()
+            invalidations.debounce(debounceTimeout).take(1).collect()
         }
     }
 
@@ -198,7 +189,7 @@ private class ShooterWebView(context: Context) : WebView(context) {
     }
 
     fun drawBitmap(width: Int, height: Int, scale: Float): Bitmap =
-        Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        createBitmap(width, height)
             .applyCanvas { withScale(scale, scale) { draw(this) } }
 }
 
@@ -207,10 +198,8 @@ internal suspend fun View.addToWindowManager(): Boolean =
         try {
             context.windowManager.addView(this@addToWindowManager, windowParams)
             true
-        } catch (e: CancellationException) {
-            throw e
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.e(TAG, "Error adding View", e)
+            log("Error adding View", e)
             false
         }
     }
@@ -232,10 +221,8 @@ internal suspend fun View.removeFromWindowManager(): Boolean =
         try {
             context.windowManager.removeView(this@removeFromWindowManager)
             true
-        } catch (e: CancellationException) {
-            throw e
         } catch (e: Exception) {
-            if (BuildConfig.DEBUG) Log.e(TAG, "Error removing View", e)
+            log("Error removing View", e)
             false
         }
     }
@@ -245,8 +232,7 @@ internal suspend fun WebView.awaitLoadUrl(url: String): String? =
         suspendCancellableCoroutine { continuation ->
             webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
-                    ensureActive()
-                    continuation.resume(url)
+                    if (continuation.isActive) continuation.resume(url)
                 }
             }
             continuation.invokeOnCancellation { post { stopLoading() } }
@@ -262,8 +248,7 @@ internal suspend fun WebView.awaitLayout(width: Int, height: Int) {
             postVisualStateCallback(
                 0, object : WebView.VisualStateCallback() {
                     override fun onComplete(requestId: Long) {
-                        ensureActive()
-                        continuation.resume(Unit)
+                        if (continuation.isActive) continuation.resume(Unit)
                     }
                 }
             )
@@ -282,7 +267,8 @@ internal suspend fun awaitFrames(count: Int) {
         suspendCancellableCoroutine { continuation ->
             val callback = object : Choreographer.FrameCallback {
                 override fun doFrame(it: Long) {
-                    ensureActive()
+                    if (!continuation.isActive) return
+
                     if (frames-- > 0) {
                         choreographer.postFrameCallback(this)
                     } else {

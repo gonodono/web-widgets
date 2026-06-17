@@ -3,9 +3,11 @@
 A demonstration of drawing rendered `WebView` content into App Widget images
 along with various features, for both `RemoteViews` and Glance.
 
+<!--suppress HtmlDeprecatedAttribute -->
 <p align="center">
+<!--suppress CheckImageSize -->
 <img src="images/widgets.png" 
-alt="Screenshots of emulators showing an instance of each non-Minimal Widget." 
+alt="Screenshots of emulators showing an instance of each Widget." 
 width="30%" />
 </p>
 
@@ -25,25 +27,35 @@ This project contains complete working examples to supplement those outlined in
 
 ## Overview
 
-- Each framework has three versions: Minimal, Simple, and Scroll.
+- `WebView` must be attached to a displayed hierarchy in order for it to render
+  anything. This app demonstrates two slightly different ways to attach one
+  offscreen, though each has its own catch.
 
-  - The Minimal ones are rather bare-bones; just enough to show as busy before
-    displaying a static image or a failure message.
+  - Placing the `WebView` in a 0x0 `FrameLayout` added directly to
+    `WindowManager`. The collapsed container keeps everything invisible while we
+    load and capture sites, but we have to have the `SYSTEM_ALERT_WINDOW`
+    permission in order to get it there in the first place.
 
-  - The Simple versions provide reload buttons, create more efficient images,
-    and are clickable to allow opening their pages in a browser app.
+  - Setting the `WebView` as the content of a `Presentation` hosted on a
+    `VirtualDisplay`. This method doesn't require the alert permission, but
+    `WebView` itself will consistently log a particular (caught) `Exception` and
+    stacktrace concerning an unavailable input method. This is apparently
+    unavoidable (apart from some really hacky hacks), and even frameworks like
+    React Native are susceptible to it.
 
-  - The Scroll ones have the same features as the Simple, but the image is
+  The virtual `Presentation` is considered the default method here. The demo's
+  `Activity` offers a simple radio selection to switch between the two.
+
+- Each framework – View and Compose – has two Widget versions, Simple and
+  Scroll.
+
+  - The Simple versions provide reload buttons, create images sized to the
+    Widget, and are clickable to allow opening their pages in a browser app.
+
+  - The Scroll versions have the same features as the Simple, but the image is
     created to be (almost) as tall as is allowed by the App Widget API's size
     limit, and is then displayed as the only item in a `ListView` or
     `LazyColumn`.
-
-- All of the Widgets use the same overall method to generate their images: a
-  `WebView` is instantiated and, in order to enable rendering, attached to
-  `WindowManager` inside a zero-by-zero `FrameLayout`. A page is then loaded,
-  laid out, and drawn to a `Bitmap` that's displayed in the Widget, after which
-  everything is cleaned up. For the non-Minimal ones, this is consolidated in a
-  separate helper class named [`WebShooter`][web-shooter].
 
 - Neither framework's examples really do much as far as data persistence goes.
   The `RemoteViews` versions do save state to disk, but only because
@@ -52,7 +64,7 @@ This project contains complete working examples to supplement those outlined in
   because `GlanceAppWidget`s hang around until the process is killed, which is
   sufficient for a demo but probably not so for production.
 
-- All of the examples assume that the page will load relatively quickly. Each
+- All the examples assume that the page will load relatively quickly. Each
   one uses only the time available to it from its own component; i.e., there are
   no separate `Worker`s or loader `Service`s. Consult the corresponding sections
   below for the individual Widgets' respective time limits. In production, I'd
@@ -63,20 +75,6 @@ This project contains complete working examples to supplement those outlined in
 
 ## RemoteViews
 
-### Minimal
-
-<sup>[`RemoteViewsMinimalWidget`][remoteviews-minimal]</sup>
-
-The Minimal version simply displays a static image or a failure message after
-showing an indeterminate indicator while busy. The actual image is the same
-width as the screen and half its height, though it's obviously scaled down in
-the Widget. There's nothing special about the height measure; I cut it in half
-so it kinda fits OK in a 2x2 portrait Widget.
-
-A coroutine is launched from the `AppWidgetProvider`'s `onUpdate()` to handle
-the page load, layout, and draw. It takes advantage of `BroadcastReceiver`'s
-`goAsync()` functionality to get about 10 seconds to finish its work.
-
 ### Simple
 
 <sup>[`RemoteViewsSimpleWidget`][remoteviews-simple]</sup>
@@ -86,9 +84,8 @@ itself can be clicked to open the currently displayed page in a (separate)
 browser app. Also, this one creates `Bitmap`s that are sized to match the Widget
 rather than the screen, to cut down on overhead.
 
-This one launches a coroutine from `onUpdate()` like the Minimal one, with the
-same ~10-second timeout, but its `WebView` operations and draw routine are all
-handled in the `WebShooter` class.
+This one launches a coroutine from `onUpdate()` with an ~10-second timeout. Its
+`WebView` operations and draw routine are all handled in the `WebShooter` class.
 
 ### Scroll
 
@@ -120,13 +117,6 @@ Each Glance Widget has the same behavior and features as the corresponding
 Scroll. They all have the same timeout of 40 seconds, to come in under the
 documentation's stated limit of "about 45 seconds" for `provideContent()`.
 
-### Minimal
-
-<sup>[`GlanceMinimalWidget`][glance-minimal]</sup>
-
-The Minimal one again handles the load, layout, and draw directly, showing a
-similar busy indicator and static results.
-
 ### Simple
 
 <sup>[`BaseGlanceWidget`][glance-base],
@@ -150,10 +140,6 @@ tall as possible, and provides a `LazyColumn` with a single item for the image.
 
 ## Notes
 
-- Recent tooling updates are giving false `RestrictedApi` errors for Glance's
-  `ColorProvider`. Everything still builds correctly, though, so I'm not going
-  to bother with suppressing them for the time being.
-
 - One of the trickiest parts of this is figuring out when the `WebView` is ready
   to be drawn. Listening for the URL load to finish isn't enough, so a
   `VisualStateCallback` must be used, but even that doesn't appear to be
@@ -162,35 +148,28 @@ tall as possible, and provides a `LazyColumn` with a single item for the image.
   The [platform CTS helper class][cts-helper] that was consulted for the
   `postVisualStateCallback()` usage adds a `ViewTreeObserver.OnDrawListener`
   upon the visual callback, and then invalidates to cause an extra frame before
-  drawing in order to ensure it's ready. Aside from the fact that the relevant
-  platform test renders are extremely simplistic, that technique won't work here
-  anyway because invalidation calls go up and down the hierarchy, and this setup
-  will abort them at the `FrameLayout` because it has zero visible area.
+  drawing in order to ensure it's ready. The relevant platform test renders are
+  extremely simplistic, however, and they're pretty much guaranteed to be ready
+  immediately.
 
-  The demo originally used only `VisualStateCallback` as a readiness indicator,
-  but that callback apparently fires soon after anything can be drawn, whether
-  the render is complete or not, so it takes some guessing as to an appropriate
-  delay. It's still useful, though, as an indication that the visual structure
-  is pretty well mapped out, so we can get a height measure after it.
-
-  Waiting for the full render is a different matter, and seemingly must involve
-  some guesswork no matter how it's handled. Presently, the demo has three
-  different options for the delay method, defined in the
-  [`sealed interface DrawDelay`][draw-delay].
+  Waiting for a complex render is a different matter, and that seemingly must
+  involve some guesswork no matter how it's handled. Presently, the demo has
+  three different options for the delay method, defined in the
+  [`sealed interface DelayStrategy`][delay-strategy].
 
   - `Time` uses a simple `delay()` with an exact number of milliseconds.
-  - `Frames` waits for the specified number of display frames to elapse, per
-    `Choreographer`.
-  - `Invalidations` monitors the `WebView`'s own `invalidate()` calls, and uses
+  - `Frames` waits for the specified number of display frames to elapse on the
+    main thread, per `Choreographer`.
+  - `DrawIdling` monitors the `WebView`'s own `invalidate()` calls, and uses
     a `Flow` and `debounce()` to guess when it's done updating itself.
 
-  `Invalidations` seems to be the most reliable, at least in my simple tests,
+  `DrawIdling` seems to be the most reliable, at least in my simple tests,
   but it assumes a static page. If you're loading something with animations or
   long-running scripts or the like, the `invalidate()` calls aren't going to be
   a reliable indicator. `Time`'s delay is probably the most intuitive option
   after that one, but there are likely cases where `Frames` makes more sense.
 
-- All of the Widgets currently use Wikipedia for their pages. I am not
+- All the Widgets currently use Wikipedia for their pages. I am not
   affiliated with The Wikimedia Foundation nor any of its sites or
   organizations. It is simply a reliable, lightweight site with a random page
   functionality. The reproductions of small sections of various Wikipedia
@@ -202,7 +181,7 @@ tall as possible, and provides a `LazyColumn` with a single item for the image.
 
 MIT License
 
-Copyright (c) 2025 Mike M.
+Copyright (c) 2026 Mike M.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy of
 this software and associated documentation files (the "Software"), to deal in
@@ -224,24 +203,20 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
   [so-post]: https://stackoverflow.com/a/33981965
 
-  [web-shooter]: app/src/main/kotlin/com/gonodono/webwidgets/WebShooter.kt
+  [web-shooter]: demo/src/main/kotlin/dev/gonodono/webwidgets/shooter/WebShooter.kt
 
   [sample]: https://github.com/android/user-interface-samples/tree/main/AppWidget/app/src/main/java/com/example/android/appwidget/glance/image
 
-  [remoteviews-minimal]: app/src/main/kotlin/com/gonodono/webwidgets/remoteviews/minimal/RemoteViewsMinimalWidget.kt
+  [remoteviews-simple]: demo/src/main/kotlin/dev/gonodono/webwidgets/remoteviews/simple/RemoteViewsSimpleWidget.kt
 
-  [remoteviews-simple]: app/src/main/kotlin/com/gonodono/webwidgets/remoteviews/simple/RemoteViewsSimpleWidget.kt
+  [remoteviews-scroll]: demo/src/main/kotlin/dev/gonodono/webwidgets/remoteviews/scroll/RemoteViewsScrollWidget.kt
 
-  [remoteviews-scroll]: app/src/main/kotlin/com/gonodono/webwidgets/remoteviews/scroll/RemoteViewsScrollWidget.kt
+  [glance-base]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/BaseGlanceWidget.kt
 
-  [glance-minimal]: app/src/main/kotlin/com/gonodono/webwidgets/glance/minimal/GlanceMinimalWidget.kt
+  [glance-simple]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/simple/GlanceSimpleWidget.kt
 
-  [glance-base]: app/src/main/kotlin/com/gonodono/webwidgets/glance/BaseGlanceWidget.kt
-
-  [glance-simple]: app/src/main/kotlin/com/gonodono/webwidgets/glance/simple/GlanceSimpleWidget.kt
-
-  [glance-scroll]: app/src/main/kotlin/com/gonodono/webwidgets/glance/scroll/GlanceScrollWidget.kt
+  [glance-scroll]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/scroll/GlanceScrollWidget.kt
 
   [cts-helper]: https://cs.android.com/android/platform/superproject/main/+/main:cts/tests/tests/uirendering/src/android/uirendering/cts/util/WebViewReadyHelper.java
 
-  [draw-delay]: app/src/main/kotlin/com/gonodono/webwidgets/WebShooter.kt#L52
+  [delay-strategy]: demo/src/main/kotlin/dev/gonodono/webwidgets/shooter/DelayStrategy.kt

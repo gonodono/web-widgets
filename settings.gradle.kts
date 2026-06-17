@@ -23,4 +23,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "web-widgets"
 
-include(":app")
+include(":demo")

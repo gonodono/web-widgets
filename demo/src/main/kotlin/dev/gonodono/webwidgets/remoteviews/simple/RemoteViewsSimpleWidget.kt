@@ -31,6 +31,7 @@ import dev.gonodono.webwidgets.remoteviews.updateWidgets
 import dev.gonodono.webwidgets.remoteviews.urlKey
 import dev.gonodono.webwidgets.remoteviews.widgetSizeDp
 import dev.gonodono.webwidgets.remoteviews.widgetStates
+import dev.gonodono.webwidgets.screenSize
 import dev.gonodono.webwidgets.shooter.WebShooter
 import dev.gonodono.webwidgets.takeShotForAppWidget
 import kotlinx.coroutines.isActive
@@ -86,8 +87,8 @@ class RemoteViewsSimpleWidget : AppWidgetProvider() {
 
             val viewsArray = arrayOfNulls<RemoteViews>(appWidgetIds.size)
 
-            WebShooter.create(context).use { webShooter ->
-                withTimeoutOrNull(ReceiverTimeout) {
+            withTimeoutOrNull(ReceiverTimeout) {
+                WebShooter.create(context).use { webShooter ->
                     appWidgetIds.forEachIndexed { index, id ->
                         if (!isActive) return@withTimeoutOrNull
 
@@ -127,8 +128,13 @@ private suspend fun contentViews(
     val views = simpleWidgetViews(context, appWidgetId)
 
     val url = getWidgetUrl(context, appWidgetId) ?: WikipediaRandomPageUrl
-    val size = sizeDp.toPx(context)
-    val result = webShooter.takeShotForAppWidget(url, size, true)
+    val result =
+        webShooter.takeShotForAppWidget(
+            url = url,
+            screenSize = context.screenSize(),
+            targetSize = sizeDp.toPx(context),
+            fitTargetHeight = true
+        )
     views.setImageViewBitmap(R.id.image, result.bitmap)
 
     setWidgetUrl(context, appWidgetId, result.url)

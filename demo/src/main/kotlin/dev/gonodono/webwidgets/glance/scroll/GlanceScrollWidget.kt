@@ -25,6 +25,10 @@ import dev.gonodono.webwidgets.shooter.WebShot
 
 private class GlanceScrollWidget : BaseGlanceWidget() {
 
+    class Receiver : BaseGlanceWidgetReceiver() {
+        override val glanceAppWidget: GlanceAppWidget = GlanceScrollWidget()
+    }
+
     override val imageHeightFitsWidget: Boolean = false
 
     @Composable
@@ -36,7 +40,7 @@ private class GlanceScrollWidget : BaseGlanceWidget() {
                 } else {
                     WebLinkImage(
                         webShot = webShot,
-                        receiver = GlanceScrollWidgetReceiver::class.java
+                        receiver = Receiver::class.java
                     )
                 }
             }
@@ -48,7 +52,7 @@ private fun OverflowImage(webShot: WebShot) =
     Box(contentAlignment = Alignment.BottomCenter) {
         WebLinkImage(
             webShot = webShot,
-            receiver = GlanceScrollWidgetReceiver::class.java
+            receiver = GlanceScrollWidget.Receiver::class.java
         )
         Text(
             text = "Continues…",
@@ -63,7 +67,3 @@ private fun OverflowImage(webShot: WebShot) =
                 .padding(top = 2.dp, bottom = 2.dp)
         )
     }
-
-class GlanceScrollWidgetReceiver : BaseGlanceWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = GlanceScrollWidget()
-}

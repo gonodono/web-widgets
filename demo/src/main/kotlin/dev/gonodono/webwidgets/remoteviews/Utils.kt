@@ -28,11 +28,11 @@ import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.roundToInt
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 internal const val ActionReload = "${BuildConfig.APPLICATION_ID}.action.RELOAD"
 
-internal val ReceiverTimeout = 9_500.milliseconds  // ANR at 10_000
+internal val ReceiverTimeout = 9.seconds  // ANR at 10
 
 internal var Intent.appWidgetIdExtra: Int
     get() = this.getIntExtra(EXTRA_APPWIDGET_ID, INVALID_APPWIDGET_ID)
@@ -118,7 +118,7 @@ internal fun BroadcastReceiver.doAsync(
             try {
                 coroutineScope { block() }
             } catch (_: CancellationException) {
-                // No rethrow. scope is canceled anyway.
+                // No rethrow; scope is canceled anyway.
             } catch (e: Exception) {
                 log("doAsync error", e)
             } finally {

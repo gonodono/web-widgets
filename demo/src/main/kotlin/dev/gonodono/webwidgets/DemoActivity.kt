@@ -47,7 +47,7 @@ class DemoActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { DemoContent(Modifier.fillMaxSize()) }
+        setContent { DemoContent(Modifier.fillMaxSize(), uiModel) }
     }
 
     override fun onResume() {

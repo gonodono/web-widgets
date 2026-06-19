@@ -13,8 +13,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal class OverlayWebShooter
-private constructor(override val context: Context) :
-    AbstractWebShooter(context) {
+private constructor(context: Context) : AbstractWebShooter(context) {
 
     companion object {
 
@@ -42,8 +41,6 @@ private constructor(override val context: Context) :
         frame.addView(webView)
         frame.context.windowManager.addView(frame, OverlayWindowParams)
     }
-
-    override val label: String get() = "Overlay"
 
     override fun close() {
         val frame = frameLayout

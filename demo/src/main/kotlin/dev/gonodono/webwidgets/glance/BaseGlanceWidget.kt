@@ -41,6 +41,7 @@ import dev.gonodono.webwidgets.ActionOpen
 import dev.gonodono.webwidgets.R
 import dev.gonodono.webwidgets.WikipediaRandomPageUrl
 import dev.gonodono.webwidgets.handleActionOpen
+import dev.gonodono.webwidgets.screenSize
 import dev.gonodono.webwidgets.shooter.WebShooter
 import dev.gonodono.webwidgets.shooter.WebShot
 import dev.gonodono.webwidgets.takeShotForAppWidget
@@ -50,7 +51,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.math.roundToInt
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 import android.util.Size as AndroidSize
 
 internal abstract class BaseGlanceWidget : GlanceAppWidget() {
@@ -101,7 +102,8 @@ internal abstract class BaseGlanceWidget : GlanceAppWidget() {
     private fun MainContent() {
         val state = widgetState
         val context = LocalContext.current
-        val size = with(Density(context)) { LocalSize.current.toSize() }
+        val screenSize = context.screenSize()
+        val targetSize = with(Density(context)) { LocalSize.current.toSize() }
             .run { AndroidSize(width.roundToInt(), height.roundToInt()) }
 
         Box(
@@ -119,14 +121,14 @@ internal abstract class BaseGlanceWidget : GlanceAppWidget() {
                 State.Timeout -> TimeoutMessage()
             }
             if (state !is State.Loading) {
-                ReloadButton { url = null; update(size) }
+                ReloadButton { url = null; update(screenSize, targetSize) }
             }
         }
 
-        LaunchedEffect(Unit) { update(size) }
+        LaunchedEffect(Unit) { update(screenSize, targetSize) }
     }
 
-    private fun update(size: AndroidSize) {
+    private fun update(screenSize: AndroidSize, targetSize: AndroidSize) {
         val shooter = checkNotNull(webShooter) { "Mising WebShooter" }
 
         scope.launch {
@@ -136,7 +138,8 @@ internal abstract class BaseGlanceWidget : GlanceAppWidget() {
                 withTimeoutOrNull(GlanceTimeout) {
                     shooter.takeShotForAppWidget(
                         url = url ?: WikipediaRandomPageUrl,
-                        targetSize = size,
+                        screenSize = screenSize,
+                        targetSize = targetSize,
                         fitTargetHeight = imageHeightFitsWidget
                     )
                 }
@@ -167,7 +170,7 @@ abstract class BaseGlanceWidgetReceiver : GlanceAppWidgetReceiver() {
         }
 }
 
-internal val GlanceTimeout = 40_000.milliseconds  // Max at ~45_000
+internal val GlanceTimeout = 40.seconds  // Max at ~45
 
 @Composable
 internal fun WebLinkImage(

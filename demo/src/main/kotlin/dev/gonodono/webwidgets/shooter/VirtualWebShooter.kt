@@ -12,7 +12,6 @@ import kotlinx.coroutines.withContext
 
 internal class VirtualWebShooter
 private constructor(
-    override val context: Context,
     private val virtualDisplay: VirtualDisplay,
     private val presentation: Presentation,
 ) : AbstractWebShooter(presentation.context) {
@@ -41,8 +40,9 @@ private constructor(
                         /* flags = */ VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY
                     )
             checkNotNull(virtualDisplay) { "Failed to create VirtualDisplay" }
+
             val presentation = Presentation(context, virtualDisplay.display)
-            return VirtualWebShooter(context, virtualDisplay, presentation)
+            return VirtualWebShooter(virtualDisplay, presentation)
         }
     }
 
@@ -50,8 +50,6 @@ private constructor(
         presentation.setContentView(webView)
         presentation.show()
     }
-
-    override val label: String get() = "Virtual"
 
     override fun close() {
         presentation.dismiss()

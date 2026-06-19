@@ -56,7 +56,7 @@
         <!-- Glance -->
 
         <receiver
-            android:name=".glance.simple.GlanceSimpleWidgetReceiver"
+            android:name=".glance.simple.GlanceSimpleWidget$Receiver"
             android:exported="true"
             android:label="@string/glance_simple">
             <intent-filter>
@@ -69,7 +69,7 @@
         </receiver>
 
         <receiver
-            android:name=".glance.scroll.GlanceScrollWidgetReceiver"
+            android:name=".glance.scroll.GlanceScrollWidget$Receiver"
             android:exported="true"
             android:label="@string/glance_scroll">
             <intent-filter>

@@ -19,77 +19,112 @@ This project contains complete working examples to supplement those outlined in
 ## Contents
 
 - [Overview](#overview)
-- [RemoteViews](#remoteviews)
-- [Glance](#glance)
+  - [Readiness](#readiness)
+  - [Miscellanea](#miscellanea)
+- [Examples](#examples)
+  - [RemoteViews](#remoteviews)
+  - [Glance](#glance)
 - [Notes](#notes)
 
 <br />
 
 ## Overview
 
-- `WebView` must be attached to a displayed hierarchy in order for it to render
-  anything. This app demonstrates two slightly different ways to attach one
-  offscreen, though each has its own catch.
+`WebView` must be attached to a `Window` before it will render anything. This
+app demonstrates two slightly different ways to attach one offscreen, though
+each has its own catch.
 
-  - Placing the `WebView` in a 0x0 `FrameLayout` added directly to
-    `WindowManager`. The collapsed container keeps everything invisible while we
-    load and capture sites, but we have to have the `SYSTEM_ALERT_WINDOW`
-    permission in order to get it there in the first place.
+- Placing the `WebView` in a zero-size `FrameLayout` added directly to
+  `WindowManager`. The collapsed container keeps everything hidden while we load
+  and capture sites, but we have to have the `SYSTEM_ALERT_WINDOW` (overlay)
+  permission to be able to put it there in the first place.
 
-  - Setting the `WebView` as the content of a `Presentation` hosted on a
-    `VirtualDisplay`. This method doesn't require the alert permission, but
-    `WebView` itself will consistently log a particular (caught) `Exception` and
-    stacktrace concerning an unavailable input method. This is apparently
-    unavoidable (apart from some really hacky hacks), and even frameworks like
-    React Native are susceptible to it.
+- Setting the `WebView` as the content of a `Presentation` hosted on a
+  `VirtualDisplay`. This method doesn't require the overlay permission, but
+  `WebView` itself will consistently log a particular (caught) `Exception` and
+  stacktrace concerning an `InputMethodManager` mismatch. This is apparently
+  unavoidable, apart from some really hacky hacks, and even frameworks like
+  React Native are susceptible to it.
 
-  The virtual `Presentation` is considered the default method here. The demo's
-  `Activity` offers a simple radio selection to switch between the two.
+These options are realized in the implementations of
+[`WebShooter`][web-shooter], one for each attach method:
+[`OverlayWebShooter`][overlay-web-shooter] and
+[`VirtualWebShooter`][virtual-web-shooter]. The latter is the default, and the
+demo's `Activity` has a simple radio selection to switch between the two.
 
-- Each framework – View and Compose – has two Widget versions, Simple and
-  Scroll.
+### Readiness
 
-  - The Simple versions provide reload buttons, create images sized to the
-    Widget, and are clickable to allow opening their pages in a browser app.
+One of the trickiest parts of a general solution is figuring out when an
+arbitrary page is ready to be drawn. Listening for the URL load to finish isn't
+enough, so a `VisualStateCallback` must be used, but even that doesn't appear to
+be sufficient a lot of the time.
 
-  - The Scroll versions have the same features as the Simple, but the image is
-    created to be (almost) as tall as is allowed by the App Widget API's size
-    limit, and is then displayed as the only item in a `ListView` or
-    `LazyColumn`.
+The [platform CTS helper class][cts-helper] that was consulted for the
+`postVisualStateCallback()` usage adds a `ViewTreeObserver.OnDrawListener` upon
+the visual callback, and then invalidates to cause an extra frame before drawing
+to ensure it's ready. The relevant platform test renders are extremely
+simplistic, however, and they're pretty much guaranteed to be ready immediately.
 
-- Neither framework's examples really do much as far as data persistence goes.
-  The `RemoteViews` versions do save state to disk, but only because
-  `AppWidgetProvider` instances are short-lived, and a new one is created for
-  each Widget action. The Glance versions manage to use only runtime variables
-  because `GlanceAppWidget`s hang around until the process is killed, which is
-  sufficient for a demo but probably not so for production.
+Waiting for a complex render is a different matter, and it seemingly must
+involve some guesswork no matter how it's handled. Presently, the available
+options for the delay are defined in the
+[`sealed interface DelayStrategy`][delay-strategy].
 
-- All the examples assume that the page will load relatively quickly. Each
-  one uses only the time available to it from its own component; i.e., there are
-  no separate `Worker`s or loader `Service`s. Consult the corresponding sections
-  below for the individual Widgets' respective time limits. In production, I'd
-  suggest using `Worker`s for most setups. [This official Glance sample][sample]
-  has an `ImageWorker` that's very close to what would be needed here.
+- `None` performs no delay after awaiting the initial page load and visual state
+  callback.
+- `Time` adds a simple (coroutine) `delay()` with an exact duration.
+- `Frames` waits for an additional number of display frames to elapse on the
+  main thread, per `Choreographer`.
+- `DrawIdling` monitors the `WebView`'s own `invalidate()` calls as a `Flow` and
+  uses `debounce()` to guess when it's done updating itself.
+
+For simple static pages, `None` can work perfectly well. Beyond that,
+`DrawIdling` seems to be the most robust, at least in my simple tests, but it
+also assumes a static page. If you're loading something with animations or
+long-running scripts or the like, the `invalidate()` calls aren't going to be a
+reliable indicator. `Time`'s delay is probably the most intuitive option after
+that one, but there are likely cases where `Frames` makes more sense.
+
+### Miscellanea
+
+Neither framework's examples really do much as far as data persistence goes. The
+`RemoteViews` versions do save state to disk, but only because
+`AppWidgetProvider` instances are short-lived, and a new one is created for each
+Widget action. The Glance versions manage to use only runtime variables because
+`GlanceAppWidget`s hang around until the process is killed, which is sufficient
+for a demo but probably not so for production.
+
+All the examples assume that the page will load relatively quickly. Each one
+uses only the time available to it from its own component; i.e., there are no
+separate `Worker`s or loader `Service`s. Consult the corresponding sections
+below for the individual Widgets' respective time limits. In production, I'd
+suggest using `Worker`s for most setups. [This official Glance sample][sample]
+has an `ImageWorker` that's very close to what would be needed here.
 
 <br />
 
-## RemoteViews
+## Examples
 
-### Simple
+The Minimal versions have been removed here. Updated minimal implementations can
+be found in [the linked Stack Overflow post][so-post].
+
+### RemoteViews
+
+#### Simple
 
 <sup>[`RemoteViewsSimpleWidget`][remoteviews-simple]</sup>
 
-The Simple one adds a reload button to force a new random page, and the image
-itself can be clicked to open the currently displayed page in a (separate)
-browser app. Also, this one creates `Bitmap`s that are sized to match the Widget
-rather than the screen, to cut down on overhead.
+The Simple one creates `Bitmap`s that are sized to match the Widget. It offers a
+reload button to force a new random page, and the image itself can be clicked to
+open the currently displayed page in a (separate) browser app.
 
 This one launches a coroutine from `onUpdate()` with an ~10-second timeout. Its
 `WebView` operations and draw routine are all handled in the `WebShooter` class.
 
-### Scroll
+#### Scroll
 
-<sup>[`RemoteViewsScrollWidget`][remoteviews-scroll]</sup>
+<sup>[`RemoteViewsScrollWidget`][remoteviews-scroll],
+[`RemoteViewsScrollFactory`][remoteviews-factory]</sup>
 
 The Scroll version basically adds scrolling to the Simple one, though it's a bit
 more complicated than it sounds. The only scrolling containers allowed in
@@ -108,16 +143,14 @@ figures out it can't draw. This one is mainly demonstrating how to use the time
 available in the `Factory`, if that might be useful for your particular design,
 so I didn't go to too much trouble to ensure feature parity here.
 
-<br />
-
-## Glance
+### Glance
 
 Each Glance Widget has the same behavior and features as the corresponding
 `RemoteViews` version, apart from the small UI difference for errors/timeouts in
-Scroll. They all have the same timeout of 40 seconds, to come in under the
+Scroll. They both have the same timeout of 40 seconds, to come in under the
 documentation's stated limit of "about 45 seconds" for `provideContent()`.
 
-### Simple
+#### Simple
 
 <sup>[`BaseGlanceWidget`][glance-base],
 [`GlanceSimpleWidget`][glance-simple]</sup>
@@ -128,7 +161,7 @@ nearly identical, and their common functionality is contained in
 `GlanceSimpleWidget` just tells the base class that the image should fit the
 Widget's height, and then provides a static image `Composable`.
 
-### Scroll
+#### Scroll
 
 <sup>[`BaseGlanceWidget`][glance-base],
 [`GlanceScrollWidget`][glance-scroll]</sup>
@@ -140,40 +173,22 @@ tall as possible, and provides a `LazyColumn` with a single item for the image.
 
 ## Notes
 
-- One of the trickiest parts of this is figuring out when the `WebView` is ready
-  to be drawn. Listening for the URL load to finish isn't enough, so a
-  `VisualStateCallback` must be used, but even that doesn't appear to be
-  sufficient a lot of the time.
+- The demo app offers a simple radio button selection to choose between the
+  virtual and overlay attachment options. The `RemoteViews` Simple version can
+  be refreshed immediately after changing, since it creates a new `WebShooter`
+  instance for each broadcast. The rest of the Widgets, however, will have to
+  removed and replaced in order to ensure that the change takes effect right
+  away. They all involve long-lived components that cache their `WebShooter`s.
 
-  The [platform CTS helper class][cts-helper] that was consulted for the
-  `postVisualStateCallback()` usage adds a `ViewTreeObserver.OnDrawListener`
-  upon the visual callback, and then invalidates to cause an extra frame before
-  drawing in order to ensure it's ready. The relevant platform test renders are
-  extremely simplistic, however, and they're pretty much guaranteed to be ready
-  immediately.
+- The `RemoteViews` Scroll version allows a longer page than the Glance
+  analogue, so you're not imagining things if you notice that. The reason is
+  given in comments in [`RemoteViewsScrollFactory`][remoteviews-factory].
 
-  Waiting for a complex render is a different matter, and that seemingly must
-  involve some guesswork no matter how it's handled. Presently, the demo has
-  three different options for the delay method, defined in the
-  [`sealed interface DelayStrategy`][delay-strategy].
-
-  - `Time` uses a simple `delay()` with an exact number of milliseconds.
-  - `Frames` waits for the specified number of display frames to elapse on the
-    main thread, per `Choreographer`.
-  - `DrawIdling` monitors the `WebView`'s own `invalidate()` calls, and uses
-    a `Flow` and `debounce()` to guess when it's done updating itself.
-
-  `DrawIdling` seems to be the most reliable, at least in my simple tests,
-  but it assumes a static page. If you're loading something with animations or
-  long-running scripts or the like, the `invalidate()` calls aren't going to be
-  a reliable indicator. `Time`'s delay is probably the most intuitive option
-  after that one, but there are likely cases where `Frames` makes more sense.
-
-- All the Widgets currently use Wikipedia for their pages. I am not
-  affiliated with The Wikimedia Foundation nor any of its sites or
-  organizations. It is simply a reliable, lightweight site with a random page
-  functionality. The reproductions of small sections of various Wikipedia
-  articles used in this document's graphics are believed to constitute fair use.
+- All the Widgets currently use Wikipedia for their pages. I am not affiliated
+  with The Wikimedia Foundation nor any of its sites or organizations. It is
+  simply a reliable, lightweight site with a random page functionality. The
+  reproductions of small sections of various Wikipedia articles used in this
+  document's graphics are believed to constitute fair use.
 
 <br />
 
@@ -201,22 +216,16 @@ IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
-  [so-post]: https://stackoverflow.com/a/33981965
-
-  [web-shooter]: demo/src/main/kotlin/dev/gonodono/webwidgets/shooter/WebShooter.kt
-
-  [sample]: https://github.com/android/user-interface-samples/tree/main/AppWidget/app/src/main/java/com/example/android/appwidget/glance/image
-
-  [remoteviews-simple]: demo/src/main/kotlin/dev/gonodono/webwidgets/remoteviews/simple/RemoteViewsSimpleWidget.kt
-
-  [remoteviews-scroll]: demo/src/main/kotlin/dev/gonodono/webwidgets/remoteviews/scroll/RemoteViewsScrollWidget.kt
-
-  [glance-base]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/BaseGlanceWidget.kt
-
-  [glance-simple]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/simple/GlanceSimpleWidget.kt
-
-  [glance-scroll]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/scroll/GlanceScrollWidget.kt
-
-  [cts-helper]: https://cs.android.com/android/platform/superproject/main/+/main:cts/tests/tests/uirendering/src/android/uirendering/cts/util/WebViewReadyHelper.java
-
-  [delay-strategy]: demo/src/main/kotlin/dev/gonodono/webwidgets/shooter/DelayStrategy.kt
+[so-post]: https://stackoverflow.com/a/33981965
+[web-shooter]: demo/src/main/kotlin/dev/gonodono/webwidgets/shooter/WebShooter.kt
+[overlay-web-shooter]: demo/src/main/kotlin/dev/gonodono/webwidgets/shooter/OverlayWebShooter.kt
+[virtual-web-shooter]: demo/src/main/kotlin/dev/gonodono/webwidgets/shooter/VirtualWebShooter.kt
+[cts-helper]: https://cs.android.com/android/platform/superproject/main/+/main:cts/tests/tests/uirendering/src/android/uirendering/cts/util/WebViewReadyHelper.java
+[delay-strategy]: demo/src/main/kotlin/dev/gonodono/webwidgets/shooter/DelayStrategy.kt
+[sample]: https://github.com/android/user-interface-samples/tree/main/AppWidget/app/src/main/java/com/example/android/appwidget/glance/image
+[remoteviews-simple]: demo/src/main/kotlin/dev/gonodono/webwidgets/remoteviews/simple/RemoteViewsSimpleWidget.kt
+[remoteviews-scroll]: demo/src/main/kotlin/dev/gonodono/webwidgets/remoteviews/scroll/RemoteViewsScrollWidget.kt
+[remoteviews-factory]: demo/src/main/kotlin/dev/gonodono/webwidgets/remoteviews/scroll/RemoteViewsScrollFactory.kt
+[glance-base]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/BaseGlanceWidget.kt
+[glance-simple]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/simple/GlanceSimpleWidget.kt
+[glance-scroll]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/scroll/GlanceScrollWidget.kt

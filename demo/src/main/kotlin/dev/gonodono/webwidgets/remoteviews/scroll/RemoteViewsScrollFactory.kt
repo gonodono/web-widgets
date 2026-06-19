@@ -22,7 +22,7 @@ import dev.gonodono.webwidgets.shooter.WebShot
 import dev.gonodono.webwidgets.takeShotForAppWidget
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 private class RemoteViewsScrollFactory(
     private val context: Context,
@@ -122,4 +122,4 @@ private fun timeoutViews(context: Context): RemoteViews =
     RemoteViews(context.packageName, R.layout.widget_scroll_text)
         .apply { setTextViewText(R.id.text, context.getText(R.string.timeout)) }
 
-private val ServiceTimeout = 40_000.milliseconds  // Matches GlanceTimeout
+private val ServiceTimeout = 40.seconds  // Matches GlanceTimeout

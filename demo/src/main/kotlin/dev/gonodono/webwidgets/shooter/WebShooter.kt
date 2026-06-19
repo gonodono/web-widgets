@@ -14,10 +14,11 @@ import androidx.core.graphics.applyCanvas
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.withScale
 import dev.gonodono.webwidgets.appSettings
-import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.collect
@@ -31,14 +32,12 @@ import kotlin.math.roundToInt
 
 interface WebShooter : AutoCloseable {
 
-    val context: Context
-
     suspend fun takeShot(
         url: String,
         width: Int,
         maxHeight: Int,
         layoutWidth: Int,
-        delayStrategy: DelayStrategy = DefaultDelayStrategy
+        delayStrategy: DelayStrategy = DelayStrategy.None
     ): WebShot
 
     companion object {
@@ -65,33 +64,9 @@ interface WebShooter : AutoCloseable {
 
 internal abstract class AbstractWebShooter(context: Context) : WebShooter {
 
-    private var _invalidations: MutableSharedFlow<Unit>? = null
+    protected val webView = WebShooterWebView(context)
 
-    // We intercept invalidate() calls in order to minimize work on the main
-    // thread but WebView won't stop invalidating until it draws so we fake it.
-    protected val webView =
-        object : WebView(context) {
-
-            private val choreographer = Choreographer.getInstance()
-
-            private val fakeViewTreeDraw =
-                Choreographer.FrameCallback { draw(DummyCanvas) }
-
-            override fun invalidate() {
-                choreographer.postFrameCallback(fakeViewTreeDraw)
-                _invalidations?.tryEmit(Unit)
-            }
-        }
-
-    private val invalidations: Flow<Unit>
-        get() = _invalidations
-            ?: MutableSharedFlow<Unit>(
-                extraBufferCapacity = 1,
-                onBufferOverflow = BufferOverflow.DROP_LATEST
-            )
-                .also { _invalidations = it }
-
-    override suspend fun takeShot(
+    final override suspend fun takeShot(
         url: String,
         width: Int,
         maxHeight: Int,
@@ -106,9 +81,12 @@ internal abstract class AbstractWebShooter(context: Context) : WebShooter {
         val view = webView
         view.measureAndLayout(layoutWidth, 1)
 
-        val terminus = view.awaitLoadUrl(url)
+        val loaded = view.awaitLoadUrl(url)
+        view.awaitVisualStateCallback()
 
-        performDelay(delayStrategy) { invalidations }
+        currentCoroutineContext().ensureActive()
+
+        performDelay(delayStrategy) { webView.invalidations }
 
         val contentHeight = view.contentHeightPx()
         val scale = width.toFloat() / layoutWidth
@@ -117,6 +95,8 @@ internal abstract class AbstractWebShooter(context: Context) : WebShooter {
         val viewHeight = contentHeight.coerceAtMost(maxViewHeight)
         view.measureAndLayout(layoutWidth, viewHeight)
         view.awaitVisualStateCallback()
+
+        currentCoroutineContext().ensureActive()
 
         val scaledContentHeight = (contentHeight * scale).toInt()
         val imageHeight = scaledContentHeight.coerceAtMost(maxHeight)
@@ -128,33 +108,58 @@ internal abstract class AbstractWebShooter(context: Context) : WebShooter {
         }
 
         return WebShot(
-            url = terminus,
+            url = loaded,
             bitmap = bitmap,
             overflows = scaledContentHeight > maxHeight
         )
     }
 
-    protected abstract val label: String
-
     private var paint: Paint? = null
 
     private fun Canvas.drawLabel(width: Int) {
-        if (!context.appSettings.drawTypeLabel) return
+        if (!webView.context.appSettings.drawTypeLabel) return
+
+        val name = this@AbstractWebShooter.javaClass.simpleName
+        val label = name.replace("WebShooter", "")
 
         val paint = this@AbstractWebShooter.paint
             ?: Paint().also {
+                it.color = Color.MAGENTA
                 it.textAlign = Paint.Align.CENTER
                 this@AbstractWebShooter.paint = it
             }
-        val size = width / 5F
-        paint.textSize = size
-        paint.color = Color.MAGENTA
-        drawText(label, 0, label.length, width / 2F, size, paint)
+
+        val textSize = width / 5F
+        paint.textSize = textSize
+
+        this.drawText(label, 0, label.length, width / 2F, textSize, paint)
+    }
+}
+
+internal class WebShooterWebView(context: Context) : WebView(context) {
+
+    private val choreographer = Choreographer.getInstance()
+
+    private val fakeViewTreeDraw =
+        Choreographer.FrameCallback { draw(DummyCanvas) }
+
+    private var _invalidations: MutableSharedFlow<Unit>? = null
+
+    val invalidations: Flow<Unit>
+        get() = _invalidations
+            ?: MutableSharedFlow<Unit>(
+                extraBufferCapacity = 1,
+                onBufferOverflow = BufferOverflow.DROP_LATEST
+            )
+                .also { _invalidations = it }
+
+    init {
+        visibility = GONE
     }
 
-    override fun close() {
-        _invalidations = null
-        paint = null
+    override fun invalidate() {
+        choreographer.postFrameCallback(fakeViewTreeDraw)
+        _invalidations?.tryEmit(Unit)
     }
 
     private companion object {
@@ -172,34 +177,49 @@ internal suspend fun WebView.measureAndLayout(width: Int, height: Int) =
 
 internal suspend fun WebView.awaitLoadUrl(url: String): String? =
     withContext(Dispatchers.Main) {
-        val view = this@awaitLoadUrl
-        val original = view.webViewClient
+        val original = this@awaitLoadUrl.webViewClient
 
         suspendCancellableCoroutine { continuation ->
             webViewClient =
                 object : WebViewClient() {
                     override fun onPageFinished(view: WebView, url: String?) {
                         view.webViewClient = original
-                        continuation.resumeIfActive(url)
+                        if (continuation.isActive) continuation.resume(url)
                     }
                 }
 
             continuation.invokeOnCancellation {
-                view.post {
-                    view.webViewClient = original
-                    view.stopLoading()
+                this@awaitLoadUrl.post {
+                    this@awaitLoadUrl.stopLoading()
+                    this@awaitLoadUrl.webViewClient = original
                 }
             }
 
-            view.loadUrl(url)
+            this@awaitLoadUrl.loadUrl(url)
+        }
+    }
+
+internal suspend fun WebView.awaitVisualStateCallback() =
+    withContext(Dispatchers.Main) {
+        suspendCancellableCoroutine { continuation ->
+            val callback =
+                object : WebView.VisualStateCallback() {
+                    override fun onComplete(requestId: Long) {
+                        if (continuation.isActive) continuation.resume(Unit)
+                    }
+                }
+            this@awaitVisualStateCallback.postVisualStateCallback(0, callback)
         }
     }
 
 internal suspend fun performDelay(
     strategy: DelayStrategy,
     drawFlow: () -> Flow<*>
-) =
+) {
     when (strategy) {
+        is DelayStrategy.None -> {
+            return
+        }
         is DelayStrategy.Time -> {
             delay(strategy.time)
         }
@@ -216,6 +236,7 @@ internal suspend fun performDelay(
             }
         }
     }
+}
 
 internal suspend fun awaitMainThreadFrames(count: Int) {
     if (count <= 0) return
@@ -246,25 +267,6 @@ internal suspend fun awaitMainThreadFrames(count: Int) {
 
 // It's OK to use WebView's Context for density here; it's copied from actual.
 internal suspend fun WebView.contentHeightPx(): Int =
-    withContext(Dispatchers.Main) {
-        val height = this@contentHeightPx.contentHeight
-        val density = this@contentHeightPx.resources.displayMetrics.density
-        (height * density).roundToInt()
+    withContext(Dispatchers.Main) { this@contentHeightPx.contentHeight }.let {
+        (it * this@contentHeightPx.resources.displayMetrics.density).roundToInt()
     }
-
-internal suspend fun WebView.awaitVisualStateCallback() =
-    withContext(Dispatchers.Main) {
-        suspendCancellableCoroutine { continuation ->
-            val callback =
-                object : WebView.VisualStateCallback() {
-                    override fun onComplete(requestId: Long) =
-                        continuation.resumeIfActive(Unit)
-                }
-            this@awaitVisualStateCallback.postVisualStateCallback(0, callback)
-        }
-    }
-
-@Suppress("NOTHING_TO_INLINE")
-private inline fun <T> CancellableContinuation<T>.resumeIfActive(value: T) {
-    if (this.isActive) this.resume(value)
-}

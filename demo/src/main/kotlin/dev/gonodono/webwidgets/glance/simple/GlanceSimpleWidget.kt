@@ -9,13 +9,13 @@ import dev.gonodono.webwidgets.shooter.WebShot
 
 private class GlanceSimpleWidget : BaseGlanceWidget() {
 
+    class Receiver : BaseGlanceWidgetReceiver() {
+        override val glanceAppWidget: GlanceAppWidget = GlanceSimpleWidget()
+    }
+
     override val imageHeightFitsWidget: Boolean = true
 
     @Composable
     override fun Content(webShot: WebShot) =
-        WebLinkImage(webShot, GlanceSimpleWidgetReceiver::class.java)
-}
-
-class GlanceSimpleWidgetReceiver : BaseGlanceWidgetReceiver() {
-    override val glanceAppWidget: GlanceAppWidget = GlanceSimpleWidget()
+        WebLinkImage(webShot, Receiver::class.java)
 }

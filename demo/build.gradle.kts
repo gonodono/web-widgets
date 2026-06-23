@@ -41,9 +41,9 @@ android {
 
 dependencies {
     implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core.remoteviews)
     implementation(libs.androidx.activity.compose)
-    implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.webkit)
+    implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.window)
 
     implementation(platform(libs.androidx.compose.bom))
@@ -51,6 +51,4 @@ dependencies {
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.tooling.preview)
     debugImplementation(libs.androidx.ui.tooling)
-
-    implementation(libs.androidx.glance.appwidget)
 }

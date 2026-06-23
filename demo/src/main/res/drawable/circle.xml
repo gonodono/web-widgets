@@ -8,7 +8,7 @@
             android:width="40dp"
             android:height="40dp" />
 
-        <solid android:color="@color/control_gray" />
+        <solid android:color="@android:color/darker_gray" />
 
     </shape>
 

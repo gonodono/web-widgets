@@ -8,44 +8,37 @@ import android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
 import android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
 import android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
 import android.widget.FrameLayout
-import dev.gonodono.webwidgets.checkIsMainThread
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 internal class OverlayWebShooter
-private constructor(context: Context) : AbstractWebShooter(context) {
+private constructor(override val mainContext: Context) :
+    AbstractWebShooter(mainContext) {
 
     companion object {
 
         fun canDraw(context: Context): Boolean =
             Settings.canDrawOverlays(context)
 
-        suspend fun create(context: Context): OverlayWebShooter =
-            withContext(Dispatchers.Main) { createWebShooter(context) }
-
-        fun createBlocking(context: Context): OverlayWebShooter {
-            checkIsMainThread()
-            return createWebShooter(context)
-        }
-
-        private fun createWebShooter(context: Context): OverlayWebShooter {
+        suspend fun create(context: Context): OverlayWebShooter {
             check(canDraw(context)) { "Missing SYSTEM_ALERT_WINDOW permission" }
-            return OverlayWebShooter(context)
+            return withContext(Dispatchers.Main) { OverlayWebShooter(context) }
         }
     }
 
-    private val frameLayout = FrameLayout(context.applicationContext)
+    private val frameLayout = FrameLayout(mainContext)
 
     init {
         val frame = frameLayout
         frame.addView(webView)
-        frame.context.windowManager.addView(frame, OverlayWindowParams)
+        mainContext.windowManager.addView(frame, OverlayWindowParams)
+        isReady.complete(Unit)
     }
 
     override fun close() {
         val frame = frameLayout
         frame.post {
-            frame.context.windowManager.removeView(frame)
+            mainContext.windowManager.removeView(frame)
             frame.removeView(webView)
         }
     }

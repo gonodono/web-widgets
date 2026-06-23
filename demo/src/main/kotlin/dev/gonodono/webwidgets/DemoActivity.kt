@@ -37,7 +37,6 @@ import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.application
-import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -47,7 +46,7 @@ class DemoActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContent { DemoContent(Modifier.fillMaxSize(), uiModel) }
+        setContent { DemoContent(uiModel, Modifier.fillMaxSize()) }
     }
 
     override fun onResume() {
@@ -58,8 +57,8 @@ class DemoActivity : ComponentActivity() {
 
 @Composable
 private fun DemoContent(
-    modifier: Modifier = Modifier,
-    uiModel: UiModel = viewModel()
+    uiModel: UiModel,
+    modifier: Modifier = Modifier
 ) {
     val uiState by uiModel.uiState.collectAsState()
 
@@ -132,8 +131,8 @@ private fun DemoContent(
 }
 
 internal data class UiState(
-    val useVirtualWebShooter: Boolean,
     val hasOverlayPermission: Boolean,
+    val useVirtualWebShooter: Boolean,
     val drawTypeLabel: Boolean
 )
 
@@ -163,16 +162,15 @@ internal class UiModel(application: Application) :
 private fun Context.currentState(): UiState {
     val appSettings = this.appSettings
     return UiState(
-        useVirtualWebShooter = appSettings.useVirtualWebShooter,
         hasOverlayPermission = Settings.canDrawOverlays(this),
+        useVirtualWebShooter = appSettings.useVirtualWebShooter,
         drawTypeLabel = appSettings.drawTypeLabel
     )
 }
 
 private fun Context.openManageOverlayPermission() {
     val uri = "package:${this.packageName}".toUri()
-    val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, uri)
-    this.startActivity(intent)
+    this.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, uri))
 }
 
 @Stable

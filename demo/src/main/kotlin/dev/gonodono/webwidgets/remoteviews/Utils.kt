@@ -10,16 +10,11 @@ import android.appwidget.AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.SharedPreferences
 import android.content.res.Configuration.ORIENTATION_PORTRAIT
 import android.os.Bundle
 import android.util.Size
-import android.view.View
 import android.widget.RemoteViews
-import androidx.core.content.edit
 import dev.gonodono.webwidgets.BuildConfig
-import dev.gonodono.webwidgets.R
-import dev.gonodono.webwidgets.log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -30,15 +25,9 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.seconds
 
-internal const val ActionReload = "${BuildConfig.APPLICATION_ID}.action.RELOAD"
+internal const val ActionRandom = "${BuildConfig.APPLICATION_ID}.action.RANDOM"
 
 internal val ReceiverTimeout = 9.seconds  // ANR at 10
-
-internal var Intent.appWidgetIdExtra: Int
-    get() = this.getIntExtra(EXTRA_APPWIDGET_ID, INVALID_APPWIDGET_ID)
-    set(value) {
-        this.putExtra(EXTRA_APPWIDGET_ID, value)
-    }
 
 internal inline val Context.appWidgetManager: AppWidgetManager
     get() = AppWidgetManager.getInstance(this)
@@ -49,63 +38,29 @@ internal fun AppWidgetManager.updateWidgets(
 ) =
     appWidgetIds.forEach { this.updateAppWidget(it, views) }
 
-internal fun busyViews(context: Context): RemoteViews =
-    RemoteViews(context.packageName, R.layout.widget_busy)
-
-internal fun RemoteViews.showView(id: Int) =
-    this.setViewVisibility(id, View.VISIBLE)
-
-
-internal val Context.widgetStates: SharedPreferences
-    get() = this.getSharedPreferences("widget_states", Context.MODE_PRIVATE)
-
-internal fun getWidgetUrl(context: Context, appWidgetId: Int): String? =
-    context.widgetStates.getString(urlKey(appWidgetId), null)
-
-internal fun setWidgetUrl(context: Context, appWidgetId: Int, url: String?) =
-    context.widgetStates.edit { putString(urlKey(appWidgetId), url) }
-
-internal fun urlKey(appWidgetId: Int): String = "url:$appWidgetId"
-
-
-internal fun getWidgetSizeDp(context: Context, appWidgetId: Int): Size {
-    val saved = context.widgetStates.getString(sizeDpKey(appWidgetId), null)
-    return Size.parseSize(saved ?: "0x0")
-}
-
-internal fun setWidgetSizeDp(context: Context, appWidgetId: Int, sizeDp: Size) =
-    context.widgetStates.edit {
-        putString(sizeDpKey(appWidgetId), sizeDp.toString())
+internal var Intent.appWidgetIdExtra: Int
+    get() = this.getIntExtra(EXTRA_APPWIDGET_ID, INVALID_APPWIDGET_ID)
+    set(value) {
+        this.putExtra(EXTRA_APPWIDGET_ID, value)
     }
-
-internal fun sizeDpKey(appWidgetId: Int): String = "size_dp:$appWidgetId"
-
-internal fun Size.toPx(context: Context): Size {
-    val density = context.resources.displayMetrics.density
-    return Size(
-        /* width = */ (this.width * density).roundToInt(),
-        /* height = */ (this.height * density).roundToInt()
-    )
-}
-
-internal fun Context.widgetSizeDpFromOptions(appWidgetId: Int): Size {
-    val options = this.appWidgetManager.getAppWidgetOptions(appWidgetId)
-    return options.widgetSizeDp(this.resources.configuration.orientation)
-}
 
 internal fun Bundle.widgetSizeDp(orientation: Int): Size =
     if (orientation == ORIENTATION_PORTRAIT) {
-        Size(
-            /* width = */ getInt(OPTION_APPWIDGET_MIN_WIDTH),
-            /* height = */ getInt(OPTION_APPWIDGET_MAX_HEIGHT)
-        )
+        val width = this.getInt(OPTION_APPWIDGET_MIN_WIDTH)
+        val height = this.getInt(OPTION_APPWIDGET_MAX_HEIGHT)
+        Size(width, height)
     } else {
-        Size(
-            /* width = */ getInt(OPTION_APPWIDGET_MAX_WIDTH),
-            /* height = */ getInt(OPTION_APPWIDGET_MIN_HEIGHT)
-        )
+        val width = this.getInt(OPTION_APPWIDGET_MAX_WIDTH)
+        val height = this.getInt(OPTION_APPWIDGET_MIN_HEIGHT)
+        Size(width, height)
     }
 
+internal fun Size/*Dp*/.toPx(context: Context): Size {
+    val density = context.resources.displayMetrics.density
+    val widthPx = (this.width * density).roundToInt()
+    val heightPx = (this.height * density).roundToInt()
+    return Size(widthPx, heightPx)
+}
 
 internal fun BroadcastReceiver.doAsync(
     coroutineContext: CoroutineContext = Dispatchers.Default,
@@ -119,8 +74,6 @@ internal fun BroadcastReceiver.doAsync(
                 coroutineScope { block() }
             } catch (_: CancellationException) {
                 // No rethrow; scope is canceled anyway.
-            } catch (e: Exception) {
-                log("doAsync error", e)
             } finally {
                 scope.cancel()
             }

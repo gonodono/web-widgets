@@ -5,28 +5,20 @@
     android:id="@android:id/background"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white"
+    android:background="@android:color/white"
     tools:ignore="HardcodedText,Overdraw">
 
-    <ProgressBar
-        android:id="@+id/progress"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center" />
-
-    <ListView
-        android:id="@+id/list"
+    <ViewStub
+        android:id="@+id/stub"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:cacheColorHint="@color/white"
-        android:scrollbars="none" />
+        android:layout_height="match_parent" />
 
     <ImageButton
-        android:id="@+id/reload"
+        android:id="@+id/random"
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_gravity="bottom|end"
-        android:contentDescription="Reload"
-        android:src="@drawable/reload" />
+        android:contentDescription="Random"
+        android:src="@drawable/random" />
 
 </FrameLayout>

@@ -23,7 +23,7 @@
         <!-- RemoteViews -->
 
         <receiver
-            android:name=".remoteviews.simple.RemoteViewsSimpleWidget"
+            android:name=".remoteviews.RemoteViewsSimpleWidget"
             android:exported="true"
             android:label="@string/remoteviews_simple">
             <intent-filter>
@@ -36,7 +36,7 @@
         </receiver>
 
         <receiver
-            android:name=".remoteviews.scroll.RemoteViewsScrollWidget"
+            android:name=".remoteviews.RemoteViewsScrollWidget"
             android:exported="true"
             android:label="@string/remoteviews_scroll">
             <intent-filter>
@@ -48,15 +48,11 @@
                 android:resource="@xml/widget_info" />
         </receiver>
 
-        <service
-            android:name=".remoteviews.scroll.RemoteViewsScrollService"
-            android:permission="android.permission.BIND_REMOTEVIEWS" />
-
 
         <!-- Glance -->
 
         <receiver
-            android:name=".glance.simple.GlanceSimpleWidget$Receiver"
+            android:name=".glance.GlanceSimpleWidget$Receiver"
             android:exported="true"
             android:label="@string/glance_simple">
             <intent-filter>
@@ -69,7 +65,7 @@
         </receiver>
 
         <receiver
-            android:name=".glance.scroll.GlanceScrollWidget$Receiver"
+            android:name=".glance.GlanceScrollWidget$Receiver"
             android:exported="true"
             android:label="@string/glance_scroll">
             <intent-filter>

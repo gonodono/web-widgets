@@ -72,7 +72,7 @@ options for the delay are defined in the
 
 - `None` performs no delay after awaiting the initial page load and visual state
   callback.
-- `Time` adds a simple (coroutine) `delay()` with an exact duration.
+- `Time` adds a simple (suspending) `delay()` with an exact duration.
 - `Frames` waits for an additional number of display frames to elapse on the
   main thread, per `Choreographer`.
 - `DrawIdling` monitors the `WebView`'s own `invalidate()` calls as a `Flow` and
@@ -88,7 +88,7 @@ that one, but there are likely cases where `Frames` makes more sense.
 ### Miscellanea
 
 Neither framework's examples really do much as far as data persistence goes. The
-`RemoteViews` versions do save state to disk, but only because
+`RemoteViews` versions do save some state to disk, but only because
 `AppWidgetProvider` instances are short-lived, and a new one is created for each
 Widget action. The Glance versions manage to use only runtime variables because
 `GlanceAppWidget`s hang around until the process is killed, which is sufficient
@@ -108,81 +108,54 @@ has an `ImageWorker` that's very close to what would be needed here.
 The Minimal versions have been removed here. Updated minimal implementations can
 be found in [the linked Stack Overflow post][so-post].
 
+The Simple ones create images that are sized to match their Widgets. They also
+offer buttons to load a new random page, and the images can be clicked to open
+the current page in a (separate) browser app.
+
+The Scroll versions basically add scrolling to the Simple ones by making the image
+(almost) as tall as is allowed by the API's size restrictions, and then placing
+it in a single item in a `ListView` or `LazyColumn`.
+
 ### RemoteViews
+
+These launch a coroutine from `onUpdate()` using `BroadcastReceiver`'s
+`goAsync()` functionality to get ~10 seconds of work time.
 
 #### Simple
 
-<sup>[`RemoteViewsSimpleWidget`][remoteviews-simple]</sup>
-
-The Simple one creates `Bitmap`s that are sized to match the Widget. It offers a
-reload button to force a new random page, and the image itself can be clicked to
-open the currently displayed page in a (separate) browser app.
-
-This one launches a coroutine from `onUpdate()` with an ~10-second timeout. Its
-`WebView` operations and draw routine are all handled in the `WebShooter` class.
+<sup>[`BaseRemoteViewsWidget`][remoteviews-base],
+[`RemoteViewsSimpleWidget`][remoteviews-simple]</sup>
 
 #### Scroll
 
-<sup>[`RemoteViewsScrollWidget`][remoteviews-scroll],
-[`RemoteViewsScrollFactory`][remoteviews-factory]</sup>
-
-The Scroll version basically adds scrolling to the Simple one, though it's a bit
-more complicated than it sounds. The only scrolling containers allowed in
-`RemoteViews` are a handful of `AdapterView`s, so this one requires a separate
-`RemoteViewsService` and `RemoteViewsFactory`, too.
-
-The `WebShooter` work is handled in the `RemoteViewsFactory`, so there's plenty
-of time available, but it's capped at 40 seconds to match the timeout for the
-Glance Widgets.
-
-Because of the unique setup here, this one ends up with a slightly different UI
-if it errors or times out, as those messages are displayed in `ListView` items.
-Also, since the reload button is handled in the `Provider` but the `WebShooter`
-runs in the `Factory`, there's no easy way to disable that button if the shooter
-figures out it can't draw. This one is mainly demonstrating how to use the time
-available in the `Factory`, if that might be useful for your particular design,
-so I didn't go to too much trouble to ensure feature parity here.
+<sup>[`BaseRemoteViewsWidget`][remoteviews-base],
+[`RemoteViewsScrollWidget`][remoteviews-scroll]</sup>
 
 ### Glance
 
-Each Glance Widget has the same behavior and features as the corresponding
-`RemoteViews` version, apart from the small UI difference for errors/timeouts in
-Scroll. They both have the same timeout of 40 seconds, to come in under the
-documentation's stated limit of "about 45 seconds" for `provideContent()`.
+These have a timeout of 40 seconds, to come in under the documentation's stated
+limit of "about 45 seconds" for `provideContent()`.
 
 #### Simple
 
 <sup>[`BaseGlanceWidget`][glance-base],
 [`GlanceSimpleWidget`][glance-simple]</sup>
 
-Thanks to Glance's abstractions, the Simple and Scroll implementations are
-nearly identical, and their common functionality is contained in
-`BaseGlanceWidget`, which handles all of the `WebShooter` work.
-`GlanceSimpleWidget` just tells the base class that the image should fit the
-Widget's height, and then provides a static image `Composable`.
-
 #### Scroll
 
 <sup>[`BaseGlanceWidget`][glance-base],
 [`GlanceScrollWidget`][glance-scroll]</sup>
-
-This one tells `BaseGlanceWidget` that the image height should be (almost) as
-tall as possible, and provides a `LazyColumn` with a single item for the image.
 
 <br />
 
 ## Notes
 
 - The demo app offers a simple radio button selection to choose between the
-  virtual and overlay attachment options. The `RemoteViews` Simple version can
-  be refreshed immediately after changing, since it creates a new `WebShooter`
-  instance for each broadcast. The rest of the Widgets, however, will have to
-  removed and replaced in order to ensure that the change takes effect right
-  away. They all involve long-lived components that cache their `WebShooter`s.
-
-- The `RemoteViews` Scroll version allows a longer page than the Glance
-  analogue, so you're not imagining things if you notice that. The reason is
-  given in comments in [`RemoteViewsScrollFactory`][remoteviews-factory].
+  virtual and overlay attachment options. The `RemoteViews` versions can be
+  refreshed immediately after changing, since they create a new `WebShooter`
+  instance for each broadcast. The Glance Widgets, however, will have to removed
+  and replaced in order to ensure that the change takes effect right away. They
+  involve long-lived components that cache their `WebShooter`s.
 
 - All the Widgets currently use Wikipedia for their pages. I am not affiliated
   with The Wikimedia Foundation nor any of its sites or organizations. It is
@@ -223,9 +196,9 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 [cts-helper]: https://cs.android.com/android/platform/superproject/main/+/main:cts/tests/tests/uirendering/src/android/uirendering/cts/util/WebViewReadyHelper.java
 [delay-strategy]: demo/src/main/kotlin/dev/gonodono/webwidgets/shooter/DelayStrategy.kt
 [sample]: https://github.com/android/user-interface-samples/tree/main/AppWidget/app/src/main/java/com/example/android/appwidget/glance/image
-[remoteviews-simple]: demo/src/main/kotlin/dev/gonodono/webwidgets/remoteviews/simple/RemoteViewsSimpleWidget.kt
-[remoteviews-scroll]: demo/src/main/kotlin/dev/gonodono/webwidgets/remoteviews/scroll/RemoteViewsScrollWidget.kt
-[remoteviews-factory]: demo/src/main/kotlin/dev/gonodono/webwidgets/remoteviews/scroll/RemoteViewsScrollFactory.kt
+[remoteviews-base]: demo/src/main/kotlin/dev/gonodono/webwidgets/remoteviews/BaseRemoteViewsWidget.kt
+[remoteviews-simple]: demo/src/main/kotlin/dev/gonodono/webwidgets/remoteviews/RemoteViewsSimpleWidget.kt
+[remoteviews-scroll]: demo/src/main/kotlin/dev/gonodono/webwidgets/remoteviews/RemoteViewsScrollWidget.kt
 [glance-base]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/BaseGlanceWidget.kt
-[glance-simple]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/simple/GlanceSimpleWidget.kt
-[glance-scroll]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/scroll/GlanceScrollWidget.kt
+[glance-simple]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/GlanceSimpleWidget.kt
+[glance-scroll]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/GlanceScrollWidget.kt

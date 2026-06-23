@@ -1,7 +1,6 @@
 package dev.gonodono.webwidgets.glance
 
 import android.annotation.SuppressLint
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -10,10 +9,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.util.fastRoundToInt
 import androidx.core.net.toUri
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -41,44 +42,43 @@ import dev.gonodono.webwidgets.ActionOpen
 import dev.gonodono.webwidgets.R
 import dev.gonodono.webwidgets.WikipediaRandomPageUrl
 import dev.gonodono.webwidgets.handleActionOpen
-import dev.gonodono.webwidgets.screenSize
 import dev.gonodono.webwidgets.shooter.WebShooter
 import dev.gonodono.webwidgets.shooter.WebShot
+import dev.gonodono.webwidgets.shooter.createWebShooter
 import dev.gonodono.webwidgets.takeShotForAppWidget
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
-import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.seconds
 import android.util.Size as AndroidSize
 
-internal abstract class BaseGlanceWidget : GlanceAppWidget() {
-
-    protected abstract val imageHeightFitsWidget: Boolean
+internal abstract class BaseGlanceWidget(private val clampImageHeightToWidget: Boolean) :
+    GlanceAppWidget() {
 
     @Composable
-    protected abstract fun Content(webShot: WebShot)
+    protected abstract fun Content(webShot: WebShot.Complete)
 
     private sealed interface State {
-        data object Loading : State
-        data class Complete(val webShot: WebShot) : State
+        data object Busy : State
+        data class Complete(val webShot: WebShot.Complete) : State
         data object Timeout : State
+        data object Error : State
     }
 
     private val scope = CoroutineScope(SupervisorJob())
 
-    private var widgetState by mutableStateOf<State>(State.Loading)
+    private var widgetState: State by mutableStateOf(State.Busy)
 
     private var webShooter: WebShooter? = null
 
-    private var url: String? = null
-
-    override val sizeMode = SizeMode.Exact
+    override val sizeMode: SizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        if (webShooter == null) webShooter = WebShooter.create(context)
+        if (webShooter == null) webShooter = createWebShooter(context)
 
         // The demo assumes that the host is a basic launcher that handles only
         // portrait and landscape configurations. provideGlance() is called for
@@ -89,67 +89,75 @@ internal abstract class BaseGlanceWidget : GlanceAppWidget() {
         val orientation = context.resources.configuration.orientation
         val isDevicePortrait = orientation == Configuration.ORIENTATION_PORTRAIT
         provideContent {
-            val isWidgetPortrait = LocalSize.current.run { width < height }
-            if (isWidgetPortrait == isDevicePortrait) {
-                MainContent()
-            } else {
-                CircularProgressIndicator()
-            }
+            val isWidgetPortrait = LocalSize.current.run { width <= height }
+            MainContent(isWidgetPortrait == isDevicePortrait)
         }
     }
 
     @Composable
-    private fun MainContent() {
+    private fun MainContent(isProvidingCurrentOrientation: Boolean) {
         val state = widgetState
         val context = LocalContext.current
-        val screenSize = context.screenSize()
-        val targetSize = with(Density(context)) { LocalSize.current.toSize() }
-            .run { AndroidSize(width.roundToInt(), height.roundToInt()) }
+        val size = with(Density(context)) { LocalSize.current.toSize() }
 
         Box(
             contentAlignment =
-                if (state == State.Loading) Alignment.Center
+                if (state == State.Busy) Alignment.Center
                 else Alignment.BottomEnd,
             modifier = GlanceModifier
                 .fillMaxSize()
                 .background(Color.White)
                 .appWidgetBackground()
         ) {
-            when (state) {
-                is State.Complete -> Content(state.webShot)
-                State.Loading -> CircularProgressIndicator()
-                State.Timeout -> TimeoutMessage()
+            if (isProvidingCurrentOrientation) {
+                when (state) {
+                    State.Busy -> {
+                        CircularProgressIndicator()
+                        LaunchedEffect(size) { update(size) }
+                        return@Box
+                    }
+                    is State.Complete -> Content(state.webShot)
+                    State.Timeout -> TimeoutMessage()
+                    State.Error -> ErrorMessage()
+                }
+            } else {
+                CircularProgressIndicator()
             }
-            if (state !is State.Loading) {
-                ReloadButton { url = null; update(screenSize, targetSize) }
-            }
-        }
 
-        LaunchedEffect(Unit) { update(screenSize, targetSize) }
+            RandomButton { update(size) }
+        }
     }
 
-    private fun update(screenSize: AndroidSize, targetSize: AndroidSize) {
+    private var job: Job? = null
+
+    private fun update(size: Size) {
+        job?.cancel()
+
         val shooter = checkNotNull(webShooter) { "Mising WebShooter" }
 
-        scope.launch {
-            widgetState = State.Loading
+        job = scope.launch {
+            widgetState = State.Busy
 
-            val result =
+            val width = size.width.fastRoundToInt()
+            val height = size.height.fastRoundToInt()
+            val targetSize = AndroidSize(width, height)
+
+            val webShot =
                 withTimeoutOrNull(GlanceTimeout) {
                     shooter.takeShotForAppWidget(
-                        url = url ?: WikipediaRandomPageUrl,
-                        screenSize = screenSize,
+                        url = WikipediaRandomPageUrl,
                         targetSize = targetSize,
-                        fitTargetHeight = imageHeightFitsWidget
+                        clampHeightToTarget = clampImageHeightToWidget
                     )
                 }
 
+            ensureActive()
+
             widgetState =
-                if (result != null) {
-                    url = result.url
-                    State.Complete(result)
-                } else {
-                    State.Timeout
+                when (webShot) {
+                    is WebShot.Complete -> State.Complete(webShot)
+                    is WebShot.Error -> State.Error
+                    null -> State.Timeout
                 }
         }
     }
@@ -158,24 +166,24 @@ internal abstract class BaseGlanceWidget : GlanceAppWidget() {
         webShooter?.close()
         scope.cancel()
     }
+
+    abstract class Receiver : GlanceAppWidgetReceiver() {
+
+        override fun onReceive(context: Context, intent: Intent) =
+            if (intent.action == ActionOpen) {
+                handleActionOpen(context, intent)
+            } else {
+                super.onReceive(context, intent)
+            }
+    }
 }
 
-abstract class BaseGlanceWidgetReceiver : GlanceAppWidgetReceiver() {
-
-    override fun onReceive(context: Context, intent: Intent) =
-        if (intent.action == ActionOpen) {
-            handleActionOpen(context, intent)
-        } else {
-            super.onReceive(context, intent)
-        }
-}
-
-internal val GlanceTimeout = 40.seconds  // Max at ~45
+private val GlanceTimeout = 40.seconds  // Max at ~45
 
 @Composable
 internal fun WebLinkImage(
-    webShot: WebShot,
-    receiver: Class<out BroadcastReceiver>
+    receiver: Class<out BaseGlanceWidget.Receiver>,
+    webShot: WebShot.Complete
 ) {
     val context = LocalContext.current
     Image(
@@ -183,9 +191,9 @@ internal fun WebLinkImage(
         contentDescription = "WebShot",
         modifier = GlanceModifier.run {
             if (webShot.url != null) {
-                val intent =
-                    Intent(ActionOpen, webShot.url.toUri(), context, receiver)
-                clickable(actionSendBroadcast(intent))
+                val uri = webShot.url.toUri()
+                val open = Intent(ActionOpen, uri, context, receiver)
+                clickable(actionSendBroadcast(open))
             } else {
                 this
             }
@@ -194,7 +202,7 @@ internal fun WebLinkImage(
 }
 
 @Composable
-internal fun TimeoutMessage() =
+private fun TimeoutMessage() =
     Box(
         contentAlignment = Alignment.Center,
         modifier = GlanceModifier.fillMaxSize()
@@ -202,19 +210,39 @@ internal fun TimeoutMessage() =
         Text(
             text = "Timeout",
             style = TextDefaults.defaultTextStyle.copy(
-                color = @SuppressLint("RestrictedApi") ColorProvider(Color.Magenta),
+                color = Color.Magenta.toColorProvider(),
                 fontSize = 22.sp
             )
         )
     }
 
 @Composable
-private fun ReloadButton(onClick: () -> Unit) =
+private fun ErrorMessage() {
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = GlanceModifier.fillMaxSize()
+    ) {
+        Text(
+            text = "Error",
+            style = TextDefaults.defaultTextStyle.copy(
+                color = Color.Red.toColorProvider(),
+                fontSize = 22.sp
+            )
+        )
+    }
+}
+
+@Composable
+private fun RandomButton(onClick: () -> Unit) =
     Image(
-        provider = ImageProvider(R.drawable.reload),
-        contentDescription = "Reload",
+        provider = ImageProvider(R.drawable.random),
+        contentDescription = "Random",
         modifier = GlanceModifier
             .padding(12.dp)
             .background(ImageProvider(R.drawable.circle))
             .clickable(onClick)
     )
+
+@Suppress("NOTHING_TO_INLINE")
+private inline fun Color.toColorProvider(): ColorProvider =
+    @SuppressLint("RestrictedApi") ColorProvider(this)

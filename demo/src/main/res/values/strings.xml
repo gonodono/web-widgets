@@ -8,6 +8,4 @@
     <string name="remoteviews_simple">RemoteViews Simple</string>
     <string name="remoteviews_scroll">RemoteViews Scroll</string>
 
-    <string name="timeout"><font color="magenta">Timeout</font></string>
-
 </resources>

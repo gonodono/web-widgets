@@ -88,11 +88,13 @@ that one, but there are likely cases where `Frames` makes more sense.
 
 ## Examples
 
-Minimal examples for both frameworks can be found in [the linked Stack Overflow
-post][so-post].
+Minimal examples of the virtual `Presentation` method for both frameworks can be
+found in [the linked Stack Overflow post][so-post]. Similar examples for the
+overlay method would be nearly identical, just with an added `FrameLayout` and
+some `WindowManager` calls in place of the `Presentation` setup.
 
-The repo currently contains a scrolling Widget with a reload button in each
-framework:
+The repo currently contains a scrolling Widget with a reload button in both
+frameworks, each capable of both the overlay and virtual methods:
 
 - [`RemoteViewsWebWidget`][remoteviews-widget]
 - [`GlanceWebWidget`][glance-widget]

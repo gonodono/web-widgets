@@ -6,7 +6,7 @@
 
     <application
         android:icon="@mipmap/ic_launcher"
-        android:label="@string/app_name"
+        android:label="Web Widgets"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
@@ -19,13 +19,10 @@
             </intent-filter>
         </activity>
 
-
-        <!-- RemoteViews -->
-
         <receiver
-            android:name=".remoteviews.RemoteViewsSimpleWidget"
+            android:name=".glance.GlanceWebWidget$Receiver"
             android:exported="true"
-            android:label="@string/remoteviews_simple">
+            android:label="Glance">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -36,38 +33,9 @@
         </receiver>
 
         <receiver
-            android:name=".remoteviews.RemoteViewsScrollWidget"
+            android:name=".remoteviews.RemoteViewsWebWidget"
             android:exported="true"
-            android:label="@string/remoteviews_scroll">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info" />
-        </receiver>
-
-
-        <!-- Glance -->
-
-        <receiver
-            android:name=".glance.GlanceSimpleWidget$Receiver"
-            android:exported="true"
-            android:label="@string/glance_simple">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_info" />
-        </receiver>
-
-        <receiver
-            android:name=".glance.GlanceScrollWidget$Receiver"
-            android:exported="true"
-            android:label="@string/glance_scroll">
+            android:label="RemoteViews">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>

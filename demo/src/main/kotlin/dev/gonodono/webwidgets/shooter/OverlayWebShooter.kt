@@ -29,18 +29,12 @@ private constructor(override val mainContext: Context) :
     private val frameLayout = FrameLayout(mainContext)
 
     init {
-        val frame = frameLayout
-        frame.addView(webView)
-        mainContext.windowManager.addView(frame, OverlayWindowParams)
-        isReady.complete(Unit)
+        frameLayout.addView(webView)
+        mainContext.windowManager.addView(frameLayout, OverlayWindowParams)
     }
 
     override fun close() {
-        val frame = frameLayout
-        frame.post {
-            mainContext.windowManager.removeView(frame)
-            frame.removeView(webView)
-        }
+        frameLayout.post { mainContext.windowManager.removeView(frameLayout) }
     }
 }
 

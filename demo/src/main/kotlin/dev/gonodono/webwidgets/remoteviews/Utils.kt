@@ -11,9 +11,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration.ORIENTATION_PORTRAIT
-import android.os.Bundle
 import android.util.Size
-import android.widget.RemoteViews
 import dev.gonodono.webwidgets.BuildConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,20 +21,11 @@ import kotlinx.coroutines.launch
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.roundToInt
-import kotlin.time.Duration.Companion.seconds
 
-internal const val ActionRandom = "${BuildConfig.APPLICATION_ID}.action.RANDOM"
-
-internal val ReceiverTimeout = 9.seconds  // ANR at 10
+internal const val ActionReload = "${BuildConfig.APPLICATION_ID}.action.RELOAD"
 
 internal inline val Context.appWidgetManager: AppWidgetManager
     get() = AppWidgetManager.getInstance(this)
-
-internal fun AppWidgetManager.updateWidgets(
-    appWidgetIds: IntArray,
-    views: RemoteViews
-) =
-    appWidgetIds.forEach { this.updateAppWidget(it, views) }
 
 internal var Intent.appWidgetIdExtra: Int
     get() = this.getIntExtra(EXTRA_APPWIDGET_ID, INVALID_APPWIDGET_ID)
@@ -44,22 +33,28 @@ internal var Intent.appWidgetIdExtra: Int
         this.putExtra(EXTRA_APPWIDGET_ID, value)
     }
 
-internal fun Bundle.widgetSizeDp(orientation: Int): Size =
+internal fun widgetSize(context: Context, appWidgetId: Int): Size {
+    val orientation = context.resources.configuration.orientation
+    val options = context.appWidgetManager.getAppWidgetOptions(appWidgetId)
+
+    val widthDp: Int
+    val heightDp: Int
     if (orientation == ORIENTATION_PORTRAIT) {
-        val width = this.getInt(OPTION_APPWIDGET_MIN_WIDTH)
-        val height = this.getInt(OPTION_APPWIDGET_MAX_HEIGHT)
-        Size(width, height)
+        widthDp = options.getInt(OPTION_APPWIDGET_MIN_WIDTH)
+        heightDp = options.getInt(OPTION_APPWIDGET_MAX_HEIGHT)
     } else {
-        val width = this.getInt(OPTION_APPWIDGET_MAX_WIDTH)
-        val height = this.getInt(OPTION_APPWIDGET_MIN_HEIGHT)
-        Size(width, height)
+        widthDp = options.getInt(OPTION_APPWIDGET_MAX_WIDTH)
+        heightDp = options.getInt(OPTION_APPWIDGET_MIN_HEIGHT)
+    }
+    if (widthDp > 0 && heightDp > 0) {
+        val density = context.resources.displayMetrics.density
+        val width = (widthDp * density).roundToInt()
+        val height = (heightDp * density).roundToInt()
+        return Size(width, height)
     }
 
-internal fun Size/*Dp*/.toPx(context: Context): Size {
-    val density = context.resources.displayMetrics.density
-    val widthPx = (this.width * density).roundToInt()
-    val heightPx = (this.height * density).roundToInt()
-    return Size(widthPx, heightPx)
+    val info = context.appWidgetManager.getAppWidgetInfo(appWidgetId)
+    return Size(info.minWidth, info.minHeight)
 }
 
 internal fun BroadcastReceiver.doAsync(

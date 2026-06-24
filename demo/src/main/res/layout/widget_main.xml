@@ -14,11 +14,11 @@
         android:layout_height="match_parent" />
 
     <ImageButton
-        android:id="@+id/random"
+        android:id="@+id/reload"
         android:layout_width="48dp"
         android:layout_height="48dp"
         android:layout_gravity="bottom|end"
-        android:contentDescription="Random"
-        android:src="@drawable/random" />
+        android:contentDescription="Reload"
+        android:src="@drawable/reload" />
 
 </FrameLayout>

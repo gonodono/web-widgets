@@ -40,10 +40,6 @@ private constructor(
     }
 
     init {
-        presentation.setOnShowListener {
-            presentation.setOnShowListener(null)
-            webView.post { isReady.complete(Unit) }
-        }
         presentation.setContentView(webView)
         presentation.show()
     }

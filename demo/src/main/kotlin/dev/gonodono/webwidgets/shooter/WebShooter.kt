@@ -12,7 +12,6 @@ import androidx.core.graphics.applyCanvas
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.withScale
 import dev.gonodono.webwidgets.appSettings
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.currentCoroutineContext
@@ -40,11 +39,11 @@ interface WebShooter : AutoCloseable {
 
     val mainContext: Context
 
-    suspend fun takeShot(
+    suspend fun shoot(
         url: String,
         width: Int,
         maxHeight: Int,
-        layoutWidth: Int,
+        layoutWidth: Int = width,
         delayStrategy: DelayStrategy = DelayStrategy.None
     ): WebShot
 }
@@ -53,9 +52,7 @@ internal abstract class AbstractWebShooter(context: Context) : WebShooter {
 
     protected val webView = WebShooterWebView(context)
 
-    protected val isReady = CompletableDeferred<Unit>()
-
-    final override suspend fun takeShot(
+    final override suspend fun shoot(
         url: String,
         width: Int,
         maxHeight: Int,
@@ -66,8 +63,6 @@ internal abstract class AbstractWebShooter(context: Context) : WebShooter {
         check(width > 0) { "width must be positive: $width" }
         check(maxHeight > 0) { "maxHeight must be positive: $maxHeight" }
         check(layoutWidth > 0) { "layoutWidth must be positive: $layoutWidth" }
-
-        isReady.await()
 
         return try {
             shootLocked(url, width, maxHeight, layoutWidth, delayStrategy)
@@ -117,8 +112,6 @@ internal abstract class AbstractWebShooter(context: Context) : WebShooter {
         }
 }
 
-// We intercept invalidate() calls here in order to minimize work on the main
-// thread, but WebView won't stop invalidating until it draws, so we fake it.
 internal class WebShooterWebView(context: Context) : WebView(context) {
 
     init {
@@ -167,14 +160,14 @@ internal suspend fun WebView.awaitLoadUrl(url: String): String? =
                 object : WebViewClient() {
                     override fun onPageFinished(view: WebView, url: String?) {
                         view.webViewClient = original
-                        if (continuation.isActive) continuation.resume(url)
+                        continuation.resume(url)
                     }
                 }
 
             continuation.invokeOnCancellation {
                 this@awaitLoadUrl.post {
-                    this@awaitLoadUrl.stopLoading()
                     this@awaitLoadUrl.webViewClient = original
+                    this@awaitLoadUrl.stopLoading()
                 }
             }
 
@@ -187,9 +180,8 @@ internal suspend fun WebView.awaitVisualStateCallback() =
         suspendCancellableCoroutine { continuation ->
             val callback =
                 object : WebView.VisualStateCallback() {
-                    override fun onComplete(requestId: Long) {
-                        if (continuation.isActive) continuation.resume(Unit)
-                    }
+                    override fun onComplete(requestId: Long) =
+                        continuation.resume(Unit)
                 }
             this@awaitVisualStateCallback.postVisualStateCallback(0, callback)
         }

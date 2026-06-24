@@ -11,13 +11,11 @@ import androidx.window.layout.WindowMetricsCalculator
 import dev.gonodono.webwidgets.shooter.DelayStrategy
 import dev.gonodono.webwidgets.shooter.WebShooter
 import dev.gonodono.webwidgets.shooter.WebShot
-import kotlin.math.roundToInt
 import androidx.annotation.FloatRange as FloatRangeAnnotation
 
-suspend fun WebShooter.takeShotForAppWidget(
+suspend fun WebShooter.shootForAppWidget(
     url: String,
     targetSize: Size,
-    clampHeightToTarget: Boolean,
     screenSize: Size = this.mainContext.screenSize(),
     @FloatRangeAnnotation(from = 0.0, to = 1.5)
     screenAreaMultiplier: Float = 1.45F,
@@ -26,16 +24,10 @@ suspend fun WebShooter.takeShotForAppWidget(
     val width = targetSize.width
     val screenArea = screenSize.width * screenSize.height
     val maxArea = screenArea * screenAreaMultiplier
-    val maxHeightByScreenArea = (maxArea / width).roundToInt()
-    val maxHeight =
-        if (clampHeightToTarget) {
-            minOf(targetSize.height, maxHeightByScreenArea)
-        } else {
-            maxHeightByScreenArea
-        }
+    val maxHeight = (maxArea / width).toInt()
 
     val webShot =
-        this.takeShot(
+        this.shoot(
             url = url,
             width = width,
             maxHeight = maxHeight,
@@ -43,9 +35,7 @@ suspend fun WebShooter.takeShotForAppWidget(
             delayStrategy = delayStrategy
         )
 
-    if (webShot is WebShot.Complete) {
-        webShot.drawLabels(this, width, clampHeightToTarget)
-    }
+    if (webShot is WebShot.Complete) webShot.drawLabels(this, width)
 
     return webShot
 }
@@ -54,11 +44,7 @@ private fun Context.screenSize(): Size =
     WindowMetricsCalculator.getOrCreate().computeMaximumWindowMetrics(this)
         .let { metrics -> metrics.bounds.run { Size(width(), height()) } }
 
-private fun WebShot.Complete.drawLabels(
-    webShooter: WebShooter,
-    width: Int,
-    clampHeightToTarget: Boolean
-) {
+private fun WebShot.Complete.drawLabels(webShooter: WebShooter, width: Int) {
     val drawTypeLabel = webShooter.mainContext.appSettings.drawTypeLabel
     val overflows = this.overflows
     if (!drawTypeLabel && !overflows) return
@@ -73,7 +59,7 @@ private fun WebShot.Complete.drawLabels(
             val textSize = width / 5F
             drawLabel(text, textSize, width, 0F, paint)
         }
-        if (!clampHeightToTarget && overflows) {
+        if (overflows) {
             val text = "Continues…"
             val height = this@drawLabels.bitmap.height
             val textSize = width / 7F

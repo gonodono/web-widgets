@@ -19,11 +19,8 @@ This project contains complete working examples to supplement those outlined in
 ## Contents
 
 - [Overview](#overview)
-  - [Readiness](#readiness)
-  - [Miscellanea](#miscellanea)
+- [Readiness](#readiness)
 - [Examples](#examples)
-  - [RemoteViews](#remoteviews)
-  - [Glance](#glance)
 - [Notes](#notes)
 
 <br />
@@ -52,7 +49,9 @@ These options are realized in the implementations of
 [`VirtualWebShooter`][virtual-web-shooter]. The latter is the default, and the
 demo's `Activity` has a simple radio selection to switch between the two.
 
-### Readiness
+<br />
+
+## Readiness
 
 One of the trickiest parts of a general solution is figuring out when an
 arbitrary page is ready to be drawn. Listening for the URL load to finish isn't
@@ -85,77 +84,51 @@ long-running scripts or the like, the `invalidate()` calls aren't going to be a
 reliable indicator. `Time`'s delay is probably the most intuitive option after
 that one, but there are likely cases where `Frames` makes more sense.
 
-### Miscellanea
-
-Neither framework's examples really do much as far as data persistence goes. The
-`RemoteViews` versions do save some state to disk, but only because
-`AppWidgetProvider` instances are short-lived, and a new one is created for each
-Widget action. The Glance versions manage to use only runtime variables because
-`GlanceAppWidget`s hang around until the process is killed, which is sufficient
-for a demo but probably not so for production.
-
-All the examples assume that the page will load relatively quickly. Each one
-uses only the time available to it from its own component; i.e., there are no
-separate `Worker`s or loader `Service`s. Consult the corresponding sections
-below for the individual Widgets' respective time limits. In production, I'd
-suggest using `Worker`s for most setups. [This official Glance sample][sample]
-has an `ImageWorker` that's very close to what would be needed here.
-
 <br />
 
 ## Examples
 
-The Minimal versions have been removed here. Updated minimal implementations can
-be found in [the linked Stack Overflow post][so-post].
+Minimal examples for both frameworks can be found in [the linked Stack Overflow
+post][so-post].
 
-The Simple ones create images that are sized to match their Widgets. They also
-offer buttons to load a new random page, and the images can be clicked to open
-the current page in a (separate) browser app.
+The repo currently contains a scrolling Widget with a reload button in each
+framework:
 
-The Scroll versions basically add scrolling to the Simple ones by making the image
-(almost) as tall as is allowed by the API's size restrictions, and then placing
-it in a single item in a `ListView` or `LazyColumn`.
+- [`RemoteViewsWebWidget`][remoteviews-widget]
+- [`GlanceWebWidget`][glance-widget]
 
-### RemoteViews
+On each update, these Widgets load random pages from Wikipedia. The captured
+images are created to match the Widgets' actual widths, and their heights are
+calculated to be (almost) as tall as is allowed by the API's size restrictions
+for `Bitmap`s on `RemoteViews`. These tall images are then loaded as the only
+item in a `LazyColumn` or `ListView`, since we don't have access to plain
+scrolling containers in Widgets.
 
-These launch a coroutine from `onUpdate()` using `BroadcastReceiver`'s
-`goAsync()` functionality to get ~10 seconds of work time.
-
-#### Simple
-
-<sup>[`BaseRemoteViewsWidget`][remoteviews-base],
-[`RemoteViewsSimpleWidget`][remoteviews-simple]</sup>
-
-#### Scroll
-
-<sup>[`BaseRemoteViewsWidget`][remoteviews-base],
-[`RemoteViewsScrollWidget`][remoteviews-scroll]</sup>
-
-### Glance
-
-These have a timeout of 40 seconds, to come in under the documentation's stated
-limit of "about 45 seconds" for `provideContent()`.
-
-#### Simple
-
-<sup>[`BaseGlanceWidget`][glance-base],
-[`GlanceSimpleWidget`][glance-simple]</sup>
-
-#### Scroll
-
-<sup>[`BaseGlanceWidget`][glance-base],
-[`GlanceScrollWidget`][glance-scroll]</sup>
+These examples assume that the page will load relatively quickly. Each one uses
+only the time available to it from its own component; i.e., there are no
+separate `Worker`s or loader `Service`s. In production, I'd suggest using
+`Worker`s for most setups. [This official Glance sample][sample] has an
+`ImageWorker` that's very close to what would be needed here. It also shows how
+to serve images through a `FileProvider`, which is generally preferable to
+sending on the `RemoteViews` directly.
 
 <br />
 
 ## Notes
 
-- The demo app offers a simple radio button selection to choose between the
-  virtual and overlay attachment options. The `RemoteViews` versions can be
-  refreshed immediately after changing, since they create a new `WebShooter`
-  instance for each broadcast. The Glance Widgets, however, will have to removed
-  and replaced in order to ensure that the change takes effect right away. They
-  involve long-lived components that cache their `WebShooter`s.
+- The demo's Widgets aren't very smart about sizing. They will fall back to the
+  minimum sizes specified in `<appwidget-provider>` if they haven't yet been
+  updated with an actual size. This means that the first images loaded might not
+  fit their Widgets correctly, but subsequent updates should fix that. It is
+  possible to account for this, of course, but I've decided that the extra code
+  necessary to do so just added confusion, so it's been removed.
+
+- The demo `Activity` offers a simple radio button selection to choose between
+  the virtual and overlay attachment options. The `RemoteViews` Widget can be
+  refreshed immediately after changing, since it creates a new `WebShooter`
+  instance for each broadcast. The Glance Widget, however, will have to be
+  removed and replaced in order to ensure that the change takes effect right
+  away. It involves a long-lived component that caches its `WebShooter`.
 
 - All the Widgets currently use Wikipedia for their pages. I am not affiliated
   with The Wikimedia Foundation nor any of its sites or organizations. It is
@@ -195,10 +168,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 [virtual-web-shooter]: demo/src/main/kotlin/dev/gonodono/webwidgets/shooter/VirtualWebShooter.kt
 [cts-helper]: https://cs.android.com/android/platform/superproject/main/+/main:cts/tests/tests/uirendering/src/android/uirendering/cts/util/WebViewReadyHelper.java
 [delay-strategy]: demo/src/main/kotlin/dev/gonodono/webwidgets/shooter/DelayStrategy.kt
+[remoteviews-widget]: demo/src/main/kotlin/dev/gonodono/webwidgets/remoteviews/RemoteViewsWebWidget.kt
+[glance-widget]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/GlanceWebWidget.kt
 [sample]: https://github.com/android/user-interface-samples/tree/main/AppWidget/app/src/main/java/com/example/android/appwidget/glance/image
-[remoteviews-base]: demo/src/main/kotlin/dev/gonodono/webwidgets/remoteviews/BaseRemoteViewsWidget.kt
-[remoteviews-simple]: demo/src/main/kotlin/dev/gonodono/webwidgets/remoteviews/RemoteViewsSimpleWidget.kt
-[remoteviews-scroll]: demo/src/main/kotlin/dev/gonodono/webwidgets/remoteviews/RemoteViewsScrollWidget.kt
-[glance-base]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/BaseGlanceWidget.kt
-[glance-simple]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/GlanceSimpleWidget.kt
-[glance-scroll]: demo/src/main/kotlin/dev/gonodono/webwidgets/glance/GlanceScrollWidget.kt
